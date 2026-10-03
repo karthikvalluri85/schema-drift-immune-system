@@ -46,7 +46,7 @@ class Warehouse:
     # ------------------------------------------------------------------ plumbing
     def connect(self):
         if self._conn is None:
-            import snowflake.connector
+            import snowflake.connector  # noqa: I001 — lazy import keeps the CLI usable without Snowflake
             from cryptography.hazmat.primitives import serialization
 
             if not (self.s.sf_account and self.s.sf_private_key_path):

@@ -247,4 +247,4 @@ def _jsonable(v: Any) -> Any:
             return json.loads(v)
         except ValueError:
             return v
-    return v if isinstance(v, (int, float, str, bool, type(None), list, dict)) else str(v)
+    return v if isinstance(v, int | float | str | bool | list | dict | None) else str(v)
