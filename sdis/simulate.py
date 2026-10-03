@@ -28,7 +28,8 @@ BREAKING_PROFILES = {"baseline_top_k": {"STATUS": {"C": 0.8, "A": 0.2}},
 def _ensure_manifest(dbt_dir: Path) -> dict[str, Any] | None:
     mf = dbt_dir / "target" / "manifest.json"
     if not mf.exists():
-        env = {**os.environ, "SNOWFLAKE_ACCOUNT": os.environ.get("SNOWFLAKE_ACCOUNT", "offline"),
+        env = {**os.environ, "DBT_SEND_ANONYMOUS_USAGE_STATS": "false",
+               "SNOWFLAKE_ACCOUNT": os.environ.get("SNOWFLAKE_ACCOUNT", "offline"),
                "SNOWFLAKE_PRIVATE_KEY_PATH": os.environ.get("SNOWFLAKE_PRIVATE_KEY_PATH", "/dev/null")}
         subprocess.run(["dbt", "parse", "--profiles-dir", ".", "--quiet"], cwd=dbt_dir, env=env, capture_output=True)
     return json.loads(mf.read_text()) if mf.exists() else None

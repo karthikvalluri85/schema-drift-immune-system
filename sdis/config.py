@@ -43,7 +43,11 @@ class Settings:
     paperclip_company_id: str | None = field(default_factory=lambda: _env("PAPERCLIP_COMPANY_ID"))
     paperclip_run_id: str | None = field(default_factory=lambda: _env("PAPERCLIP_RUN_ID"))
     paperclip_task_id: str | None = field(default_factory=lambda: _env("PAPERCLIP_TASK_ID"))
-    # Behaviour
+    # Behaviour — adoption mode for production rollouts:
+    #   observe → detect, classify, ticket; never gate loads, never open PRs   (zero risk, no dbt changes)
+    #   advise  → observe + Surgeon PRs; still never gates loads               (humans merge)
+    #   protect → full immune system: load gate + PRs + approvals              (needs the sdis_load_gate macro)
+    mode: str = field(default_factory=lambda: _env("SDIS_MODE", "protect").lower())
     dry_run: bool = field(default_factory=lambda: _env("SDIS_DRY_RUN", "false").lower() == "true")
     trace_path: Path = field(default_factory=lambda: Path(_env("SDIS_TRACE_PATH", "traces/trace_events.jsonl")))
 

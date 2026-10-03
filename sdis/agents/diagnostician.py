@@ -27,16 +27,22 @@ def handle(ctx: Context, task: Task) -> AgentOutput:
     out = AgentOutput(agent=AGENT, run_id=ctx.tracer.run_id, status="success", incident_id=d.incident_id,
                       decisions=list(d.decisions))
 
+    mode = ctx.settings.mode
     with ctx.wh.for_incident(d.incident_id):
         ctx.wh.save_incident(d)
         status = GATE_TO_STATUS[d.gate]
-        ctx.wh.set_gate(table, load_id, status, d.incident_id, AGENT)
+        if mode != "protect" and status != "PASSED":
+            out.decisions.append(decision("adoption_mode", mode, f"Playbook says {status}; in '{mode}' mode the gate "
+                                          "is advisory, so the load is PASSED and the would-be action is recorded",
+                                          alternatives=[f"enforce {status} (requires SDIS_MODE=protect)"]))
+            status = "PASSED"
+        ctx.wh.set_gate(table, load_id, status, d.incident_id, AGENT if mode == "protect" else f"{AGENT}:{mode}")
         ctx.say(f"🩺 Diagnostician {headline(d)}")
         ctx.say(f"   route={d.route} · gate={status} · blast={d.blast_radius.tier if d.blast_radius else 'low'} "
                 f"({len(d.blast_radius.downstream_models) if d.blast_radius else 0} models, "
                 f"{len(d.blast_radius.exposures) if d.blast_radius else 0} dashboards) · "
                 f"approval={'human' if d.requires_human_approval else 'policy'}")
-        if d.gate in ("HOLD", "QUARANTINE"):
+        if d.gate in ("HOLD", "QUARANTINE") and mode == "protect":
             ctx.wh.update_incident(d.incident_id, status="MITIGATED")  # bad data can no longer reach marts
         if d.top_class == "breaking":
             prev = extras["baseline_loads"][0] if extras["baseline_loads"] else None
@@ -57,7 +63,7 @@ def handle(ctx: Context, task: Task) -> AgentOutput:
 
     parent = task.issue_id
     body = markdown(d, narrative)
-    if d.surgeon_action not in ("none", "normalize_after_confirmation"):
+    if d.surgeon_action not in ("none", "normalize_after_confirmation") and mode in ("advise", "protect"):
         ctx.delegate(Task(agent="surgeon", title=f"Remediate {d.incident_id}: {headline(d)}", description=body,
                           incident_id=d.incident_id), parent_issue_id=parent,
                      priority="critical" if d.severity in ("SEV1", "SEV2") else "medium")

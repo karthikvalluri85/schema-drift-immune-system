@@ -18,6 +18,7 @@ def manifest_dbt_dir(tmp_path_factory) -> Path:
     """dbt project copy with a parsed manifest.json (offline; dummy credentials)."""
     dst = tmp_path_factory.mktemp("dbt") / "dbt"
     shutil.copytree(ROOT / "dbt", dst, ignore=shutil.ignore_patterns("target", "logs", "dbt_packages"))
+    shutil.copytree(ROOT / "policies", dst.parent / "policies")
     env = {**os.environ, "SNOWFLAKE_ACCOUNT": "dummy", "SNOWFLAKE_PRIVATE_KEY_PATH": "/dev/null",
            "DBT_SEND_ANONYMOUS_USAGE_STATS": "false"}
     subprocess.run(["dbt", "parse", "--profiles-dir", ".", "--no-partial-parse", "--quiet"],
