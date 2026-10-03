@@ -34,7 +34,7 @@ agents:
     budgetMonthlyCents: 100
     adapter:
       type: process
-      config: {command: "sdis heartbeat sentinel", timeoutSec: 600}
+      config: {command: sdis, args: [heartbeat, sentinel], timeoutSec: 600}
     runtime:
       heartbeat: {enabled: true, intervalSec: 900, wakeOnAssignment: true, wakeOnAutomation: true, maxConcurrentRuns: 1}
     inputs: {env: *sdis_env}
@@ -45,7 +45,7 @@ agents:
     budgetMonthlyCents: 100
     adapter:
       type: process
-      config: {command: "sdis heartbeat diagnostician", timeoutSec: 600}
+      config: {command: sdis, args: [heartbeat, diagnostician], timeoutSec: 600}
     runtime:
       heartbeat: {enabled: true, intervalSec: 0, wakeOnAssignment: true, maxConcurrentRuns: 2}
     inputs: {env: *sdis_env}
@@ -56,7 +56,7 @@ agents:
     budgetMonthlyCents: 100
     adapter:
       type: process
-      config: {command: "sdis heartbeat surgeon", timeoutSec: 900}
+      config: {command: sdis, args: [heartbeat, surgeon], timeoutSec: 900}
     runtime:
       # re-wakes every 5 min to re-check CI on open PRs
       heartbeat: {enabled: true, intervalSec: 300, wakeOnAssignment: true, maxConcurrentRuns: 1}
@@ -72,7 +72,7 @@ agents:
     budgetMonthlyCents: 100
     adapter:
       type: process
-      config: {command: "sdis heartbeat diplomat", timeoutSec: 300}
+      config: {command: sdis, args: [heartbeat, diplomat], timeoutSec: 300}
     runtime:
       heartbeat: {enabled: true, intervalSec: 0, wakeOnAssignment: true, maxConcurrentRuns: 2}
     inputs:
@@ -89,7 +89,7 @@ agents:
     budgetMonthlyCents: 100
     adapter:
       type: process
-      config: {command: "sdis heartbeat auditor", timeoutSec: 1200}
+      config: {command: sdis, args: [heartbeat, auditor], timeoutSec: 1200}
     runtime:
       heartbeat: {enabled: true, intervalSec: 0, wakeOnAssignment: true, maxConcurrentRuns: 1}
     inputs:
@@ -101,8 +101,8 @@ agents:
 
 routines:
   schema-watch:
-    concurrencyPolicy: skip_if_running
-    catchUpPolicy: skip
+    concurrencyPolicy: skip_if_active
+    catchUpPolicy: skip_missed
     triggers:
       - {kind: schedule, label: Every 15 minutes, cronExpression: "*/15 * * * *", timezone: Asia/Kolkata}
   weekly-reliability-review:

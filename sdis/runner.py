@@ -75,11 +75,13 @@ def heartbeat(agent: str, settings: Settings | None = None) -> int:
         try:
             out = HANDLERS[agent](ctx, task)
             _finish(ctx, out)
-            pc.update(issue["id"], status=STATUS_TO_PAPERCLIP[out.status], comment=render_output(out))
+            pc.update(issue["id"], status=STATUS_TO_PAPERCLIP[out.status], comment=render_output(out),
+                      unblock_action="; ".join(out.next_steps + out.warnings) or None)
         except Exception as exc:
             ctx.tracer.emit("operational", "agent_error", task.incident_id, error=repr(exc))
             pc.update(issue["id"], status="blocked",
-                      comment=f"**{agent}** failed: `{type(exc).__name__}: {exc}`\n\n```\n{traceback.format_exc()[-1500:]}\n```")
+                      comment=f"**{agent}** failed: `{type(exc).__name__}: {exc}`\n\n```\n{traceback.format_exc()[-1500:]}\n```",
+                      unblock_action=f"Fix {type(exc).__name__}: {exc}")
         handled += 1
     return handled
 

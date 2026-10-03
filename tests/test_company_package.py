@@ -38,7 +38,9 @@ def test_sidecar_matches_agents_and_cli():
     for slug, cfg in side["agents"].items():
         assert cfg["budgetMonthlyCents"] > 0
         if cfg["adapter"]["type"] == "process":
-            assert cfg["adapter"]["config"]["command"] == f"sdis heartbeat {slug}"
+            # the process adapter spawns `command` directly (no shell), so args must be separate
+            assert cfg["adapter"]["config"]["command"] == "sdis"
+            assert cfg["adapter"]["config"]["args"] == ["heartbeat", slug]
             assert slug in HANDLERS
 
 

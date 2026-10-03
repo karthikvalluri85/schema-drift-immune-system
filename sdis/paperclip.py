@@ -36,7 +36,8 @@ class Paperclip:
         r = requests.request(method, f"{self.base}/api{path}", headers=headers, timeout=30, **kw)
         if r.status_code == 409:
             raise Conflict(r.text)
-        r.raise_for_status()
+        if r.status_code >= 400:
+            raise requests.HTTPError(f"{r.status_code} {method} {path}: {r.text[:500]}", response=r)
         return r.json() if r.content else {}
 
     # identity + budget
@@ -69,10 +70,16 @@ class Paperclip:
     def issue(self, issue_id: str) -> dict[str, Any]:
         return self._req("GET", f"/issues/{issue_id}")
 
-    def update(self, issue_id: str, status: str | None = None, comment: str | None = None) -> dict[str, Any]:
+    def update(self, issue_id: str, status: str | None = None, comment: str | None = None,
+               unblock_action: str | None = None) -> dict[str, Any]:
         body: dict[str, Any] = {}
         if status:
             body["status"] = status
+        if status == "blocked":
+            # Paperclip only accepts `blocked` with a blocker, a pending interaction or an unblock descriptor,
+            # and agents may only name themselves as the unblock owner.
+            body["unblockDescriptor"] = {"owner": {"agentId": self.s.paperclip_agent_id},
+                                         "action": (unblock_action or "Review the agent's last comment and decide")[:280]}
         if comment:
             body["comment"] = comment
         return self._req("PATCH", f"/issues/{issue_id}", json=body)
