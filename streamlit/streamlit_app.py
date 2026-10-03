@@ -244,7 +244,8 @@ with tab_incidents:
                              "confidence"]], use_container_width=True, hide_index=True)
         if blast.get("staging_models"):
             st.markdown("**Blast radius** — what would have broken")
-            first = (dec.get("events") or [{}])[0]
+            evs = dec.get("events") or [{}]
+            first = next((e for e in evs if e.get("drift_class") == row.TOP_CLASS), evs[0])
             st.graphviz_chart(lineage_dot(blast, f"RAW.{first.get('column_before') or first.get('column_after')}"))
         with st.expander("Deterministic decisions (the audit trail)"):
             for x in dec.get("decisions", []):
@@ -276,7 +277,8 @@ with tab_lab:
         for i, s in enumerate(story(d), 1):
             st.markdown(f"{i}. {s}")
         if d.blast_radius and d.blast_radius.staging_models:
-            e0 = d.events[0]
+            from sdis.report import primary_event
+            e0 = primary_event(d)
             st.graphviz_chart(lineage_dot(d.blast_radius.to_dict(), f"RAW.{e0.column_before or e0.column_after}"))
         st.markdown("**Surgeon's change**")
         for s in p.summary:

@@ -7,7 +7,7 @@ import requests
 
 from .config import Settings
 from .models import RouteDecision
-from .report import CLASS_LABEL, headline
+from .report import CLASS_LABEL, headline, primary_event
 
 PRIORITY = {"SEV1": "Highest", "SEV2": "High", "SEV3": "Medium", "SEV4": "Low"}
 
@@ -48,7 +48,7 @@ def adf_description(d: RouteDecision, narrative: str | None, pr_url: str | None,
 
 
 def producer_note(d: RouteDecision, owner: str | None) -> str:
-    e = d.events[0] if d.events else None
+    e = primary_event(d)
     who = owner or "upstream team"
     if not e:
         return ""

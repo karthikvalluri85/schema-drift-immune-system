@@ -4,7 +4,7 @@ from __future__ import annotations
 from ..context import Context, Task
 from ..jira import producer_note
 from ..models import AgentOutput, decision
-from ..report import headline, markdown
+from ..report import headline, markdown, primary_event
 
 AGENT = "diplomat"
 
@@ -33,7 +33,7 @@ def handle(ctx: Context, task: Task) -> AgentOutput:
         out.decisions.append(decision("notify", d.diplomat_action, f"{d.severity}: ticket + note to {owner}"))
 
     if d.diplomat_action == "jira_and_producer_confirmation":
-        e = d.events[0]
+        e = primary_event(d)
         hyp = (e.evidence.get("hypothesis") or {}).get("label", "a unit change")
         state = ctx.approval(task.issue_id, f"producer-confirm-{inc}",
                              f"Producer ({owner}) confirms {e.column_before} is now {hyp.split(' ')[0]}"

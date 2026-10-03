@@ -15,8 +15,13 @@ CLASS_LABEL = {
 }
 
 
+def primary_event(d: RouteDecision):
+    """The event that decided the incident's class (events are sorted by class name, not severity)."""
+    return next((e for e in d.events if e.drift_class == d.top_class), d.events[0] if d.events else None)
+
+
 def headline(d: RouteDecision) -> str:
-    e = d.events[0] if d.events else None
+    e = primary_event(d)
     what = ""
     if e:
         if e.drift_class == "rename":
