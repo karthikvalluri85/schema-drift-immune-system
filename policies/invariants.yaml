@@ -1,0 +1,40 @@
+# =============================================================================
+# SDIS invariants — rules enforced on every operation, regardless of agent.
+# Pattern adapted from aws-samples/sample-Agentic-Ai-Data-Operations
+# (tool-registry/invariants.yaml): each rule has a testable id and a severity.
+#   BLOCK → the operation raises InvariantViolation and the agent stops.
+#   WARN  → logged to the trace, work continues.
+# Every id below must be referenced by code in sdis/invariants.py and by a test
+# (enforced by tests/test_policies.py::test_every_invariant_is_enforced_and_tested).
+# =============================================================================
+rules:
+  - id: bronze-immutable
+    rule: Agents never write to RAW. Quarantine happens by gating loads, not by deleting or updating rows.
+    severity: BLOCK
+  - id: llm-never-routes
+    rule: Class, severity, gate and approvals come from policies/playbooks.yaml only. Cortex output is narrative text and is never read by the router.
+    severity: BLOCK
+  - id: deterministic-routing
+    rule: Same schema snapshot + profiles → same incident id, class, severity and route.
+    severity: BLOCK
+  - id: gate-transitions
+    rule: "Load gate moves only PENDING→PASSED|QUARANTINED|PENDING(hold), PASSED→QUARANTINED (re-quarantine), and QUARANTINED→PASSED with a recorded approval."
+    severity: BLOCK
+  - id: human-approval-sev1-sev2
+    rule: SEV1/SEV2 remediations never auto-merge; they need an approval recorded in Paperclip.
+    severity: BLOCK
+  - id: no-credentials-in-code
+    rule: Credentials come from environment / Paperclip secrets only (key-pair auth for Snowflake, tokens for GitHub/Jira).
+    severity: BLOCK
+  - id: every-decision-traced
+    rule: Every agent run emits an AgentOutput with a non-empty decisions[] list to the trace.
+    severity: BLOCK
+  - id: tests-before-merge
+    rule: A Surgeon PR merges only after CI (pytest + codegen check + dbt build) is green.
+    severity: BLOCK
+  - id: budget-aware
+    rule: Agents read their Paperclip budget each heartbeat; above 80% they only work SEV1/SEV2 incidents.
+    severity: WARN
+  - id: query-tagged
+    rule: Every Snowflake query carries QUERY_TAG {app, agent, incident} so cost per incident is attributable.
+    severity: WARN

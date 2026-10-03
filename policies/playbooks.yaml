@@ -1,0 +1,88 @@
+# =============================================================================
+# SDIS drift playbooks — the deterministic routing table.
+#
+# Routing is pure data + pure functions: same inputs → same route, every time.
+# LLMs (Snowflake Cortex) only write the human-readable narrative AFTER the
+# route is fixed; they can never change a class, severity, gate or approval.
+# Validated by tests/test_policies.py (every class has a playbook, every route
+# references known actions, severities are monotonic in blast radius).
+# =============================================================================
+version: 1
+
+# Precedence when one load carries several drift events (first = most severe).
+class_precedence: [breaking, semantic, rename, type_widening, additive]
+
+thresholds:
+  rename_min_score: 0.90          # weighted fingerprint score to pair a dropped + added column
+  rename_weights: {value_containment: 0.6, null_rate: 0.2, distinct_ratio: 0.2}
+  rename_min_distinct: 50         # fail safe: low-cardinality columns are never auto-paired
+  semantic_min_factor: 3.0        # median moved by ≥ 3x vs baseline …
+  semantic_min_robust_z: 6.0      # … and is ≥ 6 robust z-scores away from the baseline medians
+  semantic_baseline_loads: 7      # how many PASSED loads form the baseline
+  categorical_psi: 0.25           # population stability index for code/categorical columns
+  categorical_domain_overlap: 0.8 # values mostly the same → meanings changed, not values
+  known_factors:                  # unit-change hypotheses (factor, tolerance, label)
+    - {factor: 84.0,   tolerance: 0.10, label: "INR→USD (≈84 INR per USD)"}
+    - {factor: 100.0,  tolerance: 0.02, label: "major unit → minor unit (×100, e.g. rupees→paise)"}
+    - {factor: 1000.0, tolerance: 0.02, label: "units → thousands (×1000)"}
+
+# Blast radius tiers from dbt lineage (downstream models + exposures).
+blast_radius:
+  high:   {any_tier1_exposure: true, or_min_models: 4}
+  medium: {min_exposures: 1, or_min_models: 2}
+  # anything else is low
+
+# Severity matrix: class × blast tier.
+severity:
+  additive:      {low: SEV4, medium: SEV4, high: SEV4}
+  type_widening: {low: SEV4, medium: SEV3, high: SEV3}
+  rename:        {low: SEV3, medium: SEV2, high: SEV1}
+  breaking:      {low: SEV2, medium: SEV1, high: SEV1}
+  semantic:      {low: SEV2, medium: SEV1, high: SEV1}
+
+# Severities that always require a human approval before anything merges.
+human_approval_severities: [SEV1, SEV2]
+
+playbooks:
+  additive:
+    route: auto_document
+    gate: PASS                    # nothing consumes the new column yet
+    surgeon: add_source_column    # document it in sources.yml, tagged sdis_new_unused
+    diplomat: none
+    auto_merge_when_green: true
+    sla_minutes: 1440
+  type_widening:
+    route: contract_update_pr
+    gate: HOLD                    # contract casts would fail on new values until the PR merges
+    surgeon: update_contract_type
+    diplomat: fyi_comment
+    auto_merge_when_green: true   # unless severity requires approval
+    sla_minutes: 240
+  rename:
+    route: compat_alias_pr
+    gate: HOLD
+    surgeon: remap_source_column  # stg keeps the old alias → zero downstream change
+    diplomat: jira_and_producer_note
+    auto_merge_when_green: false
+    sla_minutes: 60
+  breaking:
+    route: quarantine_and_remap
+    gate: QUARANTINE
+    surgeon: propose_breaking_remap   # DRAFT PR: contract kept, mapping proposed from value distributions
+    diplomat: jira_and_producer_note
+    auto_merge_when_green: false
+    sla_minutes: 120
+  semantic:
+    route: quarantine_and_confirm
+    gate: QUARANTINE
+    surgeon: normalize_after_confirmation
+    diplomat: jira_and_producer_confirmation
+    auto_merge_when_green: false
+    sla_minutes: 60
+  no_drift:
+    route: pass
+    gate: PASS
+    surgeon: none
+    diplomat: none
+    auto_merge_when_green: false
+    sla_minutes: 0

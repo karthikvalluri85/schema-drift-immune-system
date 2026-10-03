@@ -1,0 +1,46 @@
+# Column map for stg_orders — the single source of truth the Surgeon edits.
+# `sdis codegen` renders models/staging/stg_orders.sql and its contract from this file.
+# Remediations change *mappings*, never downstream aliases, so marts never notice.
+model: stg_orders
+description: One row per order (latest load wins for restated orders). Amounts in INR.
+source:
+  name: raw
+  table: orders
+dedupe_key: order_id
+columns:
+- alias: order_id
+  source: ORDER_ID
+  type: number(38,0)
+  tests:
+  - not_null
+  - unique
+  description: Order identifier
+- alias: cust_id
+  source: CUST_ID
+  type: number(38,0)
+  tests:
+  - not_null
+  description: Customer join key used by every customer-level mart
+- alias: order_ts
+  source: ORDER_TS
+  type: timestamp_ntz
+  tests:
+  - not_null
+  description: Order timestamp (IST
+  no tz): null
+- alias: amount_inr
+  source: AMOUNT
+  type: number(10,2)
+  tests:
+  - not_null
+  description: Order value in INR
+- alias: status
+  source: STATUS
+  type: varchar
+  tests:
+  - not_null
+  description: '''A'' active, ''C'' completed'
+- alias: channel
+  source: CHANNEL
+  type: varchar
+  description: web / app / store
