@@ -1,6 +1,6 @@
 # Schema Drift Immune System — the complete guide
 
-This guide walks you through the whole solution. It covers what each piece of technology does, what happens in each of the five drift scenarios, and how to run it: first on your laptop for free, then on DigitalOcean. FastAPI and DigitalOcean are explained from zero. The guide ends with a tour of the Paperclip org, the Streamlit dashboard, and what FastAPI and DigitalOcean add.
+This guide walks you through the whole solution. It covers what each piece of technology does, what happens in each of the five drift scenarios, and how to run it **entirely free**: GitHub Actions as the always-on runtime, Streamlit in Snowflake and Streamlit Community Cloud for dashboards, and Paperclip on your laptop to show the org. FastAPI is explained from zero. The guide ends with a tour of the Paperclip org, the Streamlit dashboard, and what FastAPI and the free stack add. A paid server (DigitalOcean) is an optional appendix.
 
 ---
 
@@ -28,14 +28,15 @@ The rest of this guide is the detail behind those six lines.
 | Narrative | **Snowflake Cortex** `AI_COMPLETE` | Writes the plain-English summary for Jira and the PR, *after* the route is decided | Inside Snowflake | A few cents per incident |
 | Evidence | Snowflake **Time Travel** + zero-copy **CLONE** | Preserves the table as it was before a breaking change | Inside Snowflake | ≈ free (metadata only) |
 | Transformation | **dbt** (contracts, exposures, `state:modified`) | Staging and marts; lineage gives the blast radius; Slim CI builds only what changed | GitHub Actions + the Auditor | Free |
-| Orchestration | **Paperclip** | Org chart, issues, heartbeats, budgets, approvals, audit trail | Your laptop or a Droplet | Free (open source) |
-| Agents | Python (`sdis`) | 5 deterministic agents via Paperclip's `process` adapter | Same host as Paperclip | $0 in LLM tokens |
+| Orchestration (showcase) | **Paperclip** | Org chart, issues, heartbeats, budgets, approvals, audit trail | Your laptop, when you present | Free (open source) |
+| Runtime (always on) | **GitHub Actions** | Runs the same agents on a schedule and on events: PR merged, producer answered | GitHub | Free on public repos |
+| Agents | Python (`sdis`) | 5 deterministic agents: Paperclip's `process` adapter or `sdis run` in Actions | Paperclip or Actions | $0 in LLM tokens |
 | Manager agent | **Claude Code** (`claude_local` adapter) | Head of Data Reliability: reviews SEV1/SEV2 PRs, runs the weekly review | Same host | Your Anthropic usage, capped at $20/month by the Paperclip budget |
 | Code + CI | **GitHub** + Actions | PRs, Slim CI, prod deploy, security scans | GitHub | Free for public repos |
 | Ticketing | **Jira Cloud** | One ticket per incident with blast radius and a producer note | karthikvalluri1985.atlassian.net | Free tier |
-| API | **FastAPI** | Webhooks from GitHub and Jira, read API, on-demand scan | Laptop / Droplet | Free |
-| Dashboard | **Streamlit** | Command center: incidents, load gate, blast radius, scenario lab, cost | Laptop / Droplet / Streamlit in Snowflake | Free |
-| Hosting | **DigitalOcean** Droplet + Caddy | 24×7 home for Paperclip + API + dashboard with HTTPS | DigitalOcean | ≈ $12–24/month, billed hourly |
+| API | **FastAPI** | Webhooks, read API, on-demand scan; in the free setup GitHub Actions takes the events instead | Your laptop | Free |
+| Dashboard (live) | **Streamlit in Snowflake** | Command center on your real incidents | Snowflake | Trial credits while open |
+| Dashboard (public) | **Streamlit Community Cloud** | Shareable demo-mode dashboard for LinkedIn | share.streamlit.io | Free; sleeps after 12 h idle |
 
 **Why no LangGraph?** Paperclip *is* the orchestration layer. Its issues and heartbeats are the state machine, its org chart is the routing between agents, and it adds budgets, approvals and a UI that LangGraph doesn't have. The routing *inside* an incident is a YAML table (`policies/playbooks.yaml`), which keeps it reproducible and auditable.
 
@@ -67,7 +68,7 @@ Producer changes a table ──► new batch lands in RAW (_LOAD_ID = L20261003)
    gate → PASSED  →  dbt build <staging>+  →  RESOLVED, minutes + credits logged
 ```
 
-Every arrow above is a **Paperclip issue** (parent incident and child tasks). Every decision is written to the issue thread, to Snowflake, and to `traces/trace_events.jsonl`.
+Under Paperclip, every arrow above is a **Paperclip issue** (parent incident and child tasks). In the free GitHub Actions runtime the same handlers run inside one workflow run; the merge and the producer's answer each start their own workflow. Either way, every decision is written to Snowflake and to `traces/trace_events.jsonl` (kept as a workflow artifact).
 
 ---
 
@@ -180,7 +181,7 @@ Start Paperclip from the terminal where your venv and `.env` are loaded, so the 
 - **GitHub:** create a fine-grained token with *Contents* and *Pull requests* read/write on this repo, and set it as `GITHUB_TOKEN`. In the repo, go to Settings → Secrets → Actions and add `SNOWFLAKE_ACCOUNT` and `SNOWFLAKE_DBT_PRIVATE_KEY` (the contents of `sdis_dbt.p8`) so Slim CI and deploy run. Turn on branch protection for `main` requiring the `ci` checks.
 - **Jira:** create a project with key **SDIS**. Create an API token at id.atlassian.com → Security → API tokens, then set `JIRA_EMAIL` and `JIRA_API_TOKEN`.
 
-### Step E · The demo (rename)
+### Step E · The demo with Paperclip (rename)
 
 1. Run `snowflake/scenarios/02_rename_DEMO.sql` in a worksheet.
 2. Wait for the Schema watch routine, or trigger it now: `curl -X POST localhost:8000/scan -H "Authorization: Bearer $SDIS_API_TOKEN"`.
@@ -189,7 +190,7 @@ Start Paperclip from the terminal where your venv and `.env` are loaded, so the 
 5. Approve in Paperclip → merge → the Auditor resolves.
 6. Open the Streamlit dashboard: incident timeline, blast-radius graph, minutes to contain and resolve.
 
-Without Paperclip, `sdis run --approve` does the same pass synchronously in your terminal. It's handy for a screen recording.
+Without Paperclip, `sdis run --approve` does the same pass synchronously in your terminal. It's handy for a screen recording. To run the demo on the free GitHub Actions runtime instead, see section 7.
 
 ---
 
@@ -197,7 +198,7 @@ Without Paperclip, `sdis run --approve` does the same pass synchronously in your
 
 **What it is.** FastAPI is a Python library for building web APIs. You write normal Python functions with type hints, and FastAPI turns them into HTTP endpoints. It validates inputs and generates interactive documentation at `/docs` automatically.
 
-**Why SDIS needs it.** Paperclip runs the agents, but the outside world has to be able to *reach* the company:
+**Why it's in SDIS.** Paperclip runs the agents, but the outside world has to be able to *reach* the company when it runs on a server:
 
 | Need | Without FastAPI | With FastAPI |
 |---|---|---|
@@ -210,7 +211,7 @@ Without Paperclip, `sdis run --approve` does the same pass synchronously in your
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| GET | `/health` | — | Liveness + which integrations are configured (DigitalOcean health checks use it) |
+| GET | `/health` | — | Liveness + which integrations are configured (for health checks) |
 | GET | `/scenarios`, `/scenarios/{name}` | — | Run the real engine on a built-in scenario (great for learning) |
 | GET | `/incidents`, `/incidents/{id}`, `/gate` | — (put behind Caddy/VPN in prod) | Read incidents and the load gate from Snowflake |
 | POST | `/scan` | `Bearer SDIS_API_TOKEN` | Ask the Sentinel to scan now |
@@ -227,48 +228,74 @@ curl -s localhost:8000/scenarios/semantic | python -m json.tool | head -30
 
 **How the webhook security works.** GitHub signs every delivery with your secret (HMAC-SHA256) and sends the signature in `X-Hub-Signature-256`. The API recomputes the signature and rejects anything that doesn't match, so nobody can fake "PR merged". `tests/test_api.py` shows this with a good and a bad signature.
 
+**Do you need to host it for free deployment?** No. In the free setup (section 7) GitHub Actions receives these events natively: `pull_request: closed` replaces the GitHub webhook and `repository_dispatch` replaces the Jira webhook. FastAPI stays valuable for learning (`/docs`), for local Paperclip demos, and for the day you move to an always-on server.
+
 **Testing webhooks from your laptop without a server.** Run `cloudflared tunnel --url http://localhost:8000` (free, no account needed). It prints an `https://….trycloudflare.com` URL. Paste `<url>/webhooks/github` into the GitHub repo under Settings → Webhooks → *Pull requests* events, with your secret.
 
 ---
 
-## 7. DigitalOcean from zero
+## 7. Free deployment — no servers
 
-**What it is.** A cloud provider known for simple pricing and an easy console. The two products that matter here:
+The company runs on **GitHub Actions** (free on public repos). There is no server to pay for or patch: each workflow run starts, does its work against Snowflake, GitHub and Jira, and stops. All state lives in Snowflake (`DRIFT`).
 
-- **Droplet:** a Linux virtual machine you control (like an EC2 instance). Paperclip needs a persistent disk for its embedded database, so it lives here.
-- **App Platform:** a managed service that runs your container from GitHub and handles HTTPS (like Heroku). It's optional, for the API and dashboard only.
+### 7.1 Where each piece lives
 
-**Cost, honestly.** Basic Droplets are about **$12/month (2 GB)** and **$24/month (4 GB)**, billed hourly. A 4 GB Droplet you create for a demo day and destroy afterwards costs well under $1. A card or PayPal is required at signup. The long-advertised $200 credit is reportedly now much smaller, so check the signup page.
+| Piece | Free home | What triggers it | Limits to know |
+|---|---|---|---|
+| Sentinel → Diagnostician → Surgeon / Diplomat | `.github/workflows/sdis-company.yml` | Every 3 hours, or **Run workflow** | GitHub pauses schedules on public repos with no activity for 60 days; a commit re-enables them |
+| Human approval (SEV1/SEV2) | **Merging the PR** (labelled `needs-human`) | You | The Surgeon never merges these itself |
+| SEV3/SEV4 fixes | GitHub **auto-merge** | Required checks go green | Turn on "Allow auto-merge" in repo settings |
+| Auditor | `.github/workflows/sdis-on-merge.yml` | An `sdis/inc-…` PR is merged | — |
+| Producer answer (semantic) | `.github/workflows/sdis-producer.yml` | **Run workflow** (incident + confirm/reject), or Jira Automation | Jira Free includes 100 automation runs/month |
+| Live dashboard | **Streamlit in Snowflake** | Open it in Snowsight | Uses warehouse credits while open |
+| Public dashboard | **Streamlit Community Cloud** (demo mode) | A public URL | Sleeps after 12 h without visitors; a click wakes it |
+| Org chart and agent work | **Paperclip on your laptop** | When you present | Set `SDIS_RUNTIME=paperclip` (below) so Actions doesn't double-run |
+| FastAPI | Your laptop (`uvicorn`) | `/docs` | Not needed for the free runtime |
+| Snowflake | Trial account | — | The trial is time-limited; the 10-credit monitor keeps spend capped |
 
-**If you don't want a subscription yet, you lose nothing for the demo:**
+**Why every 3 hours?** Each run wakes the XS warehouse for about a minute. Every 3 hours keeps the schedule well inside the 10-credit monitor. For demos, land a scenario and press **Run workflow**, so you never wait for the schedule.
 
-| Piece | Free option |
-|---|---|
-| Paperclip | Your laptop (`npx paperclipai onboard`) |
-| Dashboard | **Streamlit in Snowflake** (`snowflake/03_streamlit_in_snowflake.sql`). Runs on your trial with no hosting |
-| API / webhooks | Your laptop + `cloudflared` tunnel |
-| CI | GitHub Actions (free for public repos) |
+### 7.2 One-time setup (about 20 minutes)
 
-**When you're ready, deploying is two steps:**
+1. **Secrets.** Repo → Settings → Secrets and variables → Actions → *New repository secret*:
 
-1. **Create the Droplet.** In the DigitalOcean console: Create → Droplets → Region **Bangalore (BLR1)** → Ubuntu 24.04 → Basic, Regular, **4 GB / 2 vCPU** → SSH key authentication (add your public key) → Advanced options → *Add initialization scripts* → paste `deploy/digitalocean/cloud-init.yaml` → Create. In about 5 minutes it installs Node, Python, Caddy and SDIS, and turns on the firewall.
-2. **Finish the setup.** Run `ssh root@<ip>`, then `sudo /opt/sdis/repo/deploy/digitalocean/finish-setup.sh`. It generates secrets, installs the three systemd services and configures Caddy, then prints your URLs:
-   - `https://paperclip.<ip>.sslip.io`: the Paperclip UI (login required)
-   - `https://api.<ip>.sslip.io/docs`: FastAPI
-   - `https://dash.<ip>.sslip.io`: the dashboard (password-protected)
+   | Secret | Value |
+   |---|---|
+   | `SNOWFLAKE_ACCOUNT` | e.g. `abc12345.ap-south-1` |
+   | `SNOWFLAKE_AGENT_PRIVATE_KEY` | contents of `keys/sdis_agent.p8` |
+   | `SNOWFLAKE_DBT_PRIVATE_KEY` | contents of `keys/sdis_dbt.p8` |
+   | `SDIS_GITHUB_TOKEN` | fine-grained PAT on this repo: Contents + Pull requests read/write |
+   | `JIRA_EMAIL`, `JIRA_API_TOKEN` | your Atlassian login + API token |
 
-`sslip.io` turns your IP into a hostname, so **Caddy gets a real Let's Encrypt HTTPS certificate without you buying a domain**.
+   Why a PAT and not the built-in token: PRs opened with the built-in `GITHUB_TOKEN` don't trigger other workflows, so CI and the Auditor would never run on the Surgeon's PRs.
+2. **Merging rules.** Settings → General → tick **Allow auto-merge**. Settings → Branches → protect `main`: require a pull request and the status checks `test`, `slim-ci` and `scan`. Don't require an approving review: that would block SEV3/SEV4 auto-merge, and SEV1/SEV2 PRs are never merged by the bot anyway.
+3. **Live dashboard: Streamlit in Snowflake.** Snowsight → Projects → Streamlit → **+ Streamlit App** → database `SDIS_DB`, schema `DRIFT`, warehouse `SDIS_WH` → paste `streamlit/streamlit_app.py` → Run. (The scripted version is `snowflake/03_streamlit_in_snowflake.sql`.)
+4. **Public dashboard: Streamlit Community Cloud.** Sign in at share.streamlit.io with GitHub → **Create app** → repo `karthikvalluri85/schema-drift-immune-system`, branch `main`, file `streamlit/streamlit_app.py` → Deploy. With no Snowflake secrets it runs in demo mode on the real engine. That's the safe link to share on LinkedIn, because visitors never wake your warehouse.
+5. **Optional: producer answers from Jira.** Jira → Project settings → Automation → *Create rule*:
+   - Trigger: **Comment added**.
+   - Condition: *Advanced compare*, `{{comment.body}}` contains `/sdis confirm`.
+   - Action: **Send web request**, POST `https://api.github.com/repos/karthikvalluri85/schema-drift-immune-system/dispatches`, headers `Authorization: Bearer <PAT>` and `Accept: application/vnd.github+json`, custom body:
+     `{"event_type":"sdis-producer","client_payload":{"incident":"{{issue.summary.match("\[(INC-[0-9A-F]{8})\]")}}","answer":"confirm"}}`
 
-Then copy your Snowflake key (`scp keys/sdis_agent.p8 root@<ip>:/etc/sdis/keys/`), fill in `/etc/sdis/sdis.env`, import the company, run `scripts/paperclip_setup.py --activate`, and point the GitHub and Jira webhooks at the API URL.
+   Ticket summaries start with `[INC-…]` so the rule can read the incident id. If your plan doesn't offer *Send web request*, use **Run workflow** on `sdis-producer`.
 
-**Day-2 basics:**
+### 7.3 The demo on the free runtime (rename)
 
-| Task | Command |
-|---|---|
-| Logs | `journalctl -u paperclip -f` (or `sdis-api`, `sdis-dashboard`) |
-| Update | `cd /opt/sdis/repo && git pull && systemctl restart sdis-api sdis-dashboard paperclip` |
-| Backups | Paperclip backs up its database hourly. Also enable Droplet backups (+20%) or take a snapshot before upgrades |
-| Stop paying | Destroy the Droplet (snapshot first if you want to come back) |
+1. Run `snowflake/scenarios/02_rename_DEMO.sql` in Snowsight.
+2. GitHub → Actions → **sdis-company** → *Run workflow*. In about 2 minutes the job summary shows Sentinel → Diagnostician → Surgeon → Diplomat.
+3. A PR appears: `[SEV1] Rename on ORDERS: CUST_ID → CUSTOMER_ID`, a one-line diff labelled `needs-human`, with Slim CI building exactly the 5 marts. The Jira ticket `[INC-…]` has the blast radius.
+4. **Merge the PR. That is your approval.** **sdis-on-merge** runs the Auditor: gate → PASSED → `dbt build stg_orders+` → RESOLVED.
+5. Open Streamlit in Snowflake: the incident with minutes to contain and resolve.
+
+For the semantic scenario, step 4 comes after the producer answers: Actions → **sdis-producer** → incident `INC-…`, answer `confirm`. The Surgeon then opens the normalisation PR, and you merge it.
+
+### 7.4 Presenting with Paperclip on your laptop
+
+Paperclip is how you *show* the company: the org chart, issues filling in, approvals and costs. Before you start it, set repo variable **`SDIS_RUNTIME=paperclip`** (Settings → Secrets and variables → Actions → Variables). The scheduled Actions run then stands down, so the two runtimes never process the same load. Delete the variable afterwards to hand the company back to Actions. The steps are in section 5, Step C.
+
+### 7.5 Later: an always-on server (optional, paid)
+
+If you ever want Paperclip itself running 24×7 with a public URL, `deploy/digitalocean/` has a ready Droplet setup: cloud-init, Caddy HTTPS via sslip.io, and systemd units. It costs about $12–24/month, billed hourly. Nothing in the free setup depends on it.
 
 ---
 
@@ -297,20 +324,21 @@ This was verified against a live Paperclip (v2026.824) during the build: the pac
 
 Run it with `streamlit run streamlit/streamlit_app.py`. Without Snowflake env vars it opens in **demo mode** with the five simulated incidents.
 
-### 8.3 What FastAPI adds
+### 8.3 What FastAPI adds (when you run a server)
 
 - **Event-driven instead of polling:** merges and producer replies act in seconds.
 - **Meets people where they work:** producers answer in Jira; nobody needs a Paperclip login.
 - **One safe front door:** read APIs and scan triggers without handing out Snowflake credentials. Webhooks are signature-verified.
 - **Self-documenting:** `/docs` is a live, clickable contract for other teams.
 
-### 8.4 What DigitalOcean adds
+### 8.4 What the free stack adds
 
-- **Always on:** routines fire at 2 a.m. even when your laptop is closed. An immune system that sleeps isn't one.
-- **Real HTTPS endpoint** for webhooks (Caddy + Let's Encrypt), included in the price.
-- **Shareable:** recruiters and LinkedIn viewers can open the live Paperclip org and dashboard.
-- **Cheap and predictable:** one $12–24 Droplet runs the whole company. Bangalore region keeps latency low for you.
-- **Easy to grow:** move the API/dashboard to App Platform (`deploy/digitalocean/app-platform.yaml`) or Postgres to a managed database later.
+- **Always on, at $0:** GitHub Actions wakes the company on a schedule and on events. No server to pay for, patch or keep awake.
+- **Event-driven:** a merge or a producer answer starts its own workflow within seconds. Nobody polls.
+- **Approvals where engineers already are:** a SEV1 approval is a PR merge, protected by required checks.
+- **Shareable for free:** the Streamlit Community Cloud link shows the real engine to anyone, without touching your warehouse. Streamlit in Snowflake shows live incidents to you.
+- **Auditable:** every run's summary and trace are kept on the Actions tab; decisions live in Snowflake.
+- **Same code, bigger runtime later:** the agents are identical under Paperclip, Actions, or a server.
 
 ---
 

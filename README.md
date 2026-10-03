@@ -2,7 +2,7 @@
 
 **An autonomous data-reliability company that detects, contains and fixes upstream schema drift in a dbt + Snowflake platform — before a dashboard breaks.**
 
-Built on **Snowflake** (Bronze/control plane, MINHASH + HLL fingerprints, Cortex, Time Travel), **dbt** (contracts, lineage, Slim CI), **Paperclip** (org chart, heartbeats, budgets, approvals), **GitHub**, **Jira**, **FastAPI** and **Streamlit**.
+Built on **Snowflake** (Bronze/control plane, MINHASH + HLL fingerprints, Cortex, Time Travel), **dbt** (contracts, lineage, Slim CI), **Paperclip** (org chart, heartbeats, budgets, approvals), **GitHub Actions**, **Jira**, **FastAPI** and **Streamlit** — and it runs **free**: no servers.
 
 > At 2 a.m. the orders service renames `CUST_ID` → `CUSTOMER_ID`. Five marts and four dashboards — including the CFO's revenue view — would break.
 > SDIS holds the new load, proves it is a rename by matching the column's *values*, opens a one-line PR that keeps every downstream model unchanged, files a Jira ticket with the blast radius, and waits for a human to approve because it's SEV1.
@@ -48,9 +48,8 @@ flowchart LR
   G --> DBT[dbt staging → marts → dashboards]
   SU -- PR --> GH[GitHub + Slim CI]
   DI -- ticket --> J[Jira]
-  GH -- webhook --> API[FastAPI]
-  J -- /sdis confirm --> API
-  API --> A
+  GH -- PR merged --> A
+  J -- /sdis confirm --> GH
   G & D --> UI[Streamlit command center]
 ```
 
@@ -64,7 +63,20 @@ uvicorn sdis.api:app --reload # → http://localhost:8000/docs
 streamlit run streamlit/streamlit_app.py   # demo mode dashboard
 ```
 
-Then follow **[docs/GUIDE.md](docs/GUIDE.md)** for Snowflake, Paperclip, GitHub/Jira, the live demo, FastAPI and DigitalOcean.
+Then follow **[docs/GUIDE.md](docs/GUIDE.md)** for Snowflake, Paperclip, GitHub/Jira, the live demo and FastAPI.
+
+## Free deployment (no servers)
+
+| Piece | Runs on | Cost |
+|---|---|---|
+| The agent company (scheduled + event-driven) | GitHub Actions: `sdis-company`, `sdis-on-merge`, `sdis-producer` | Free on public repos |
+| Human approval for SEV1/SEV2 | Merging the `needs-human` PR | — |
+| SEV3/SEV4 fixes | GitHub auto-merge on green CI | — |
+| Live dashboard | Streamlit in Snowflake | Trial credits while open |
+| Public demo dashboard | Streamlit Community Cloud (`streamlit/streamlit_app.py`) | Free |
+| Org chart + agent showcase | Paperclip on your laptop | Free |
+
+Setup is in [docs/GUIDE.md §7](docs/GUIDE.md#7-free-deployment--no-servers). An optional paid always-on server setup lives in `deploy/digitalocean/`.
 
 ## Repository map
 
@@ -76,8 +88,8 @@ Then follow **[docs/GUIDE.md](docs/GUIDE.md)** for Snowflake, Paperclip, GitHub/
 | `snowflake/` | account setup, control plane, seed, 5 drift scenarios, Streamlit-in-Snowflake |
 | `company/` | Paperclip company package (agentcompanies/v1) + `.paperclip.yaml` |
 | `streamlit/` | command center dashboard |
-| `deploy/` | Docker, DigitalOcean cloud-init + Caddy + systemd, App Platform spec |
-| `.github/` | CI (tests → Slim CI → deploy), security scan, CODEOWNERS |
+| `.github/` | CI (tests → Slim CI → deploy), the serverless company workflows, security scan, CODEOWNERS |
+| `deploy/` | optional: Docker, DigitalOcean cloud-init + Caddy + systemd |
 
 ## Honest limits
 
