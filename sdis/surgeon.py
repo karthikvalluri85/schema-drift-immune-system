@@ -68,7 +68,7 @@ def _dump(path: Path, doc: dict[str, Any], header: str | None = None) -> None:
 
 
 def _map_header(path: Path) -> str:
-    return "\n".join(l for l in path.read_text().splitlines() if l.startswith("#"))
+    return "\n".join(ln for ln in path.read_text().splitlines() if ln.startswith("#"))
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +153,7 @@ def _share_mapping(old_top: dict[str, float], new_top: dict[str, float]) -> list
     """Pair values by rank of their share (deterministic; ties broken by value)."""
     o = sorted(old_top.items(), key=lambda kv: (-kv[1], kv[0]))
     n = sorted(new_top.items(), key=lambda kv: (-kv[1], kv[0]))
-    return [(nv, ov) for (nv, _), (ov, _) in zip(n, o)]
+    return [(nv, ov) for (nv, _), (ov, _) in zip(n, o, strict=False)]
 
 
 def propose_breaking_remap(dbt_dir: Path, d: RouteDecision, profiles: dict[str, Any] | None = None) -> Patch:

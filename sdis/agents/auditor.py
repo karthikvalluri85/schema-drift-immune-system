@@ -30,7 +30,7 @@ def handle(ctx: Context, task: Task) -> AgentOutput:
     with ctx.wh.for_incident(inc):
         ctx.wh.set_gate(table, d.load_id, "PASSED", inc, AGENT, approved=approved)
         out.decisions.append(decision("release_gate", "PASSED", "Remediation merged; load can flow downstream"))
-        sel = " ".join(f"{m}+" for m in (d.blast_radius.staging_models if d.blast_radius else [])) or "state:modified+"
+        sel = " ".join(f"{m}+" for m in (d.blast_radius.staging_models if d.blast_radius else [])) or "source:raw+"
         ok, log = _dbt_build(ctx, sel)
         out.decisions.append(decision("verify", "dbt build ok" if ok else "dbt build failed", log[-300:]))
         if not ok:

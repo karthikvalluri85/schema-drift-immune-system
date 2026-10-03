@@ -40,7 +40,7 @@ def test_rename_diff_touches_one_sql_line(manifest_dbt_dir):
     _, d = decide("rename", manifest_dbt_dir)
     _, diff = patch_preview(d, manifest_dbt_dir)
     sql_part = next(b for b in diff.split("diff --git") if b.splitlines() and b.splitlines()[0].endswith("stg_orders.sql"))
-    changed = [l for l in sql_part.splitlines() if l.startswith(("+", "-")) and not l.startswith(("+++", "---"))]
+    changed = [ln for ln in sql_part.splitlines() if ln.startswith(("+", "-")) and not ln.startswith(("+++", "---"))]
     assert changed == ["-        cast(CUST_ID as number(38,0)) as cust_id,",
                        "+        cast(CUSTOMER_ID as number(38,0)) as cust_id,"]
 

@@ -68,7 +68,8 @@ def heartbeat(agent: str, settings: Settings | None = None) -> int:
             continue
         try:
             pc.checkout(issue["id"])
-        except Exception:  # 409 Conflict → someone else owns it; never retry
+        except Exception as exc:  # 409 Conflict → someone else owns it; never retry
+            ctx.tracer.emit("operational", "checkout_skipped", None, issue=issue.get("id"), reason=repr(exc))
             continue
         task = task_from_issue(agent, issue)
         try:

@@ -82,7 +82,7 @@ class Warehouse:
             if cur.description is None:
                 return []
             cols = [c[0].upper() for c in cur.description]
-            return [dict(zip(cols, row)) for row in cur.fetchall()]
+            return [dict(zip(cols, row, strict=True)) for row in cur.fetchall()]
         finally:
             cur.close()
 

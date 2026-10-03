@@ -10,10 +10,11 @@ from __future__ import annotations
 import json
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
+
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # make `sdis` importable when run from the repo
@@ -31,7 +32,7 @@ def _backend() -> tuple[str, object]:
     try:  # 1) Streamlit in Snowflake
         from snowflake.snowpark.context import get_active_session
         return "snowflake-native", get_active_session()
-    except Exception:
+    except Exception:  # noqa: S110 — not running inside Snowflake; try the next backend
         pass
     if os.environ.get("SNOWFLAKE_ACCOUNT") and os.environ.get("SNOWFLAKE_PRIVATE_KEY_PATH"):
         from sdis.config import Settings
@@ -99,7 +100,7 @@ def load_costs() -> pd.DataFrame:
 def demo_incidents() -> pd.DataFrame:
     """Five incidents, one per drift class, produced by the real engine on fixture data."""
     from sdis.simulate import decide
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     timing = {  # minutes after open: (mitigated, resolved or None)
         "additive": (0.4, 6.0), "type_widening": (0.6, 9.5), "rename": (0.7, 7.0),
         "breaking": (0.8, None), "semantic": (0.9, None)}

@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import pytest
 
-from sdis import invariants, scenarios as S
+from sdis import invariants
+from sdis import scenarios as S
 from sdis.simulate import decide
 
 EXPECTED = {

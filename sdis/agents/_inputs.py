@@ -13,7 +13,7 @@ def analyze_load(ctx: Context, table: str, key: str | None, load_id: str) -> tup
     before_id = wh.last_passed_snapshot_id(table)
     before = wh.snapshot(table, before_id) if before_id else []
     after = wh.snapshot(table, load_id) or wh.current_schema(table)
-    baseline_loads = [l for l in wh.passed_loads(table, th["semantic_baseline_loads"]) if l != load_id]
+    baseline_loads = [x for x in wh.passed_loads(table, th["semantic_baseline_loads"]) if x != load_id]
     baseline = wh.profiles(table, baseline_loads)
     new_profiles = {c: ps[-1] for c, ps in wh.profiles(table, [load_id]).items()}
     old_profiles = {c: ps[-1] for c, ps in baseline.items()}
