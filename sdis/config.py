@@ -48,6 +48,11 @@ class Settings:
     #   advise  → observe + Surgeon PRs; still never gates loads               (humans merge)
     #   protect → full immune system: load gate + PRs + approvals              (needs the sdis_load_gate macro)
     mode: str = field(default_factory=lambda: _env("SDIS_MODE", "protect").lower())
+    # Where human approvals happen when not running under Paperclip:
+    #   cli    → asked in the terminal (or pre-answered with --approve / --confirm-producer)
+    #   github → serverless runtime: merging the PR IS the approval (branch protection requires a review);
+    #            producer confirmations arrive as a workflow_dispatch / repository_dispatch event
+    approval_channel: str = field(default_factory=lambda: _env("SDIS_APPROVAL_CHANNEL", "cli").lower())
     dry_run: bool = field(default_factory=lambda: _env("SDIS_DRY_RUN", "false").lower() == "true")
     trace_path: Path = field(default_factory=lambda: Path(_env("SDIS_TRACE_PATH", "traces/trace_events.jsonl")))
 

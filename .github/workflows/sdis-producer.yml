@@ -1,0 +1,51 @@
+# The producer's answer to a semantic incident ("is AMOUNT really USD now?").
+#   • Click "Run workflow" here (incident id + confirm/reject), or
+#   • Jira Automation (free plan: 100 rule runs/month) posts a repository_dispatch when the producer
+#     comments "/sdis confirm" on the SDIS ticket — see docs/GUIDE.md.
+# Confirm → Surgeon opens the normalisation PR (still SEV1: merging it is the approval).
+name: sdis-producer
+
+on:
+  workflow_dispatch:
+    inputs:
+      incident: {description: "Incident id, e.g. INC-357E038F", required: true, type: string}
+      answer: {description: "Producer's answer", required: true, type: choice, options: [confirm, reject]}
+  repository_dispatch:
+    types: [sdis-producer]
+
+permissions:
+  contents: read
+
+jobs:
+  answer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      INCIDENT: ${{ inputs.incident || github.event.client_payload.incident }}
+      ANSWER: ${{ inputs.answer || github.event.client_payload.answer }}
+      SDIS_APPROVAL_CHANNEL: github
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_PRIVATE_KEY_PATH: ${{ github.workspace }}/../keys/sdis_agent.p8
+      GITHUB_TOKEN: ${{ secrets.SDIS_GITHUB_TOKEN }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+      DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+    steps:
+      - name: Validate input
+        run: |
+          echo "$INCIDENT" | grep -Eq '^INC-[0-9A-Fa-f]{8}$' || { echo "bad incident id: $INCIDENT"; exit 1; }
+          case "$ANSWER" in confirm|reject) ;; *) echo "bad answer: $ANSWER"; exit 1;; esac
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0, token: "${{ secrets.SDIS_GITHUB_TOKEN || github.token }}"}
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12", cache: pip}
+      - run: pip install -e .
+      - run: |
+          mkdir -p ../keys
+          printf '%s\n' "${{ secrets.SNOWFLAKE_AGENT_PRIVATE_KEY }}" > ../keys/sdis_agent.p8
+          chmod 600 ../keys/*.p8
+      - working-directory: dbt
+        run: dbt parse --profiles-dir . --quiet
+      - name: Diplomat records the answer → Surgeon (on confirm)
+        run: sdis producer "$INCIDENT" --"$ANSWER"

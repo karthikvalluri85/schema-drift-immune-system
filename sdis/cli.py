@@ -7,6 +7,8 @@
     sdis codegen [--check]         render staging models from dbt/sdis_maps
     sdis simulate <scenario>       offline: classify + route a built-in scenario (no Snowflake)
     sdis ledger                    MTTR and credits by drift class
+    sdis on-merge --branch <ref>   serverless: a merged remediation PR wakes the Auditor
+    sdis producer <INC> --confirm|--reject   serverless: the producer's answer to a semantic incident
 """
 from __future__ import annotations
 
@@ -33,6 +35,14 @@ def main(argv: list[str] | None = None) -> int:
     sim.add_argument("scenario", choices=["additive", "rename", "type_widening", "breaking", "semantic", "all"])
     sim.add_argument("--json", action="store_true")
     sub.add_parser("ledger")
+    sub.add_parser("lineage-snapshot", help="refresh sdis/data/lineage.json from dbt/target/manifest.json")
+    om = sub.add_parser("on-merge", help="serverless: an sdis/inc-… PR was merged → Auditor verifies and resolves")
+    om.add_argument("--branch", required=True)
+    pr = sub.add_parser("producer", help="serverless: record the producer's answer for a semantic incident")
+    pr.add_argument("incident")
+    g = pr.add_mutually_exclusive_group(required=True)
+    g.add_argument("--confirm", action="store_true")
+    g.add_argument("--reject", action="store_true")
     a = p.parse_args(argv)
     s = Settings()
 
@@ -59,6 +69,30 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "heartbeat":
         from .runner import heartbeat
         heartbeat(a.agent, s)
+        return 0
+    if a.cmd == "lineage-snapshot":
+        from .blast_radius import LINEAGE_SNAPSHOT, load_manifest, slim_manifest
+        LINEAGE_SNAPSHOT.parent.mkdir(parents=True, exist_ok=True)
+        LINEAGE_SNAPSHOT.write_text(json.dumps(slim_manifest(load_manifest(s.dbt_dir)), indent=1, sort_keys=True) + "\n")
+        print(f"wrote {LINEAGE_SNAPSHOT}")
+        return 0
+    if a.cmd == "on-merge":
+        from .context import Task
+        from .runner import incident_from_branch, run_task
+        inc = incident_from_branch(a.branch)
+        if not inc:
+            print(f"{a.branch} is not an SDIS remediation branch; nothing to do")
+            return 0
+        outs = run_task(Task(agent="auditor", title=f"Verify & close {inc}", description="merged on GitHub",
+                             incident_id=inc, meta={"approved": "true"}), s)
+        print(json.dumps([{"agent": o.agent, "status": o.status, "incident": o.incident_id} for o in outs], indent=2))
+        return 0 if all(o.status != "blocked" for o in outs) else 1
+    if a.cmd == "producer":
+        from .context import Task
+        from .runner import run_task
+        outs = run_task(Task(agent="diplomat", title=f"Producer answer for {a.incident}", description="",
+                             incident_id=a.incident.upper()), s, confirm=bool(a.confirm))
+        print(json.dumps([{"agent": o.agent, "status": o.status, "incident": o.incident_id} for o in outs], indent=2))
         return 0
     if a.cmd == "ledger":
         from .agents.auditor import ledger

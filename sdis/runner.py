@@ -86,6 +86,31 @@ def heartbeat(agent: str, settings: Settings | None = None) -> int:
     return handled
 
 
+# ---------------------------------------------------------------------------- serverless events
+_BRANCH = re.compile(r"^(?:refs/heads/)?sdis/(inc-[0-9a-f]{8})-", re.I)
+
+
+def incident_from_branch(ref: str) -> str | None:
+    m = _BRANCH.match(ref or "")
+    return m.group(1).upper() if m else None
+
+
+def run_task(task: Task, settings: Settings | None = None, approve: bool | None = None,
+             confirm: bool | None = None) -> list[AgentOutput]:
+    """Run one agent task, then everything it delegates (used by the GitHub Actions event workflows)."""
+    s = settings or Settings()
+    root = Context(settings=s, agent=task.agent, approve=approve, confirm_producer=confirm)
+    root.queue.append(task)
+    outputs: list[AgentOutput] = []
+    while root.queue:
+        t: Task = root.queue.popleft()
+        ctx = Context(settings=s, agent=t.agent, approve=approve, confirm_producer=confirm, queue=root.queue)
+        ctx.__dict__["wh"] = root.wh
+        ctx.wh.agent = t.agent
+        outputs.append(_finish(ctx, HANDLERS[t.agent](ctx, t)))
+    return outputs
+
+
 # ---------------------------------------------------------------------------- local pipeline
 def run_local(settings: Settings | None = None, approve: bool | None = None, confirm: bool | None = None,
               do_bootstrap: bool = False) -> list[AgentOutput]:

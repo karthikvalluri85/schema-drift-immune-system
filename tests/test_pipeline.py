@@ -120,6 +120,8 @@ class FakeGitHub:
         self.repo_dbt, self.tmp = repo_dbt, tmp
         self.prs: dict[int, dict] = {}
         self.merged: list[int] = []
+        self.ci = "success"
+        self.auto_merge: list[int] = []
 
     def worktree(self, branch):
         wt = self.tmp / branch.replace("/", "_")
@@ -137,7 +139,7 @@ class FakeGitHub:
 
     def open_pr(self, branch, title, body, draft, labels):
         n = len(self.prs) + 1
-        self.prs[n] = {"number": n, "html_url": f"https://github.com/x/y/pull/{n}", "draft": draft, "title": title,
+        self.prs[n] = {"number": n, "node_id": f"PR_{n}", "html_url": f"https://github.com/x/y/pull/{n}", "draft": draft, "title": title,
                        "body": body, "labels": labels, "merged": False, "head": {"sha": "abc123"}}
         return self.prs[n]
 
@@ -145,7 +147,10 @@ class FakeGitHub:
         return self.prs[n]
 
     def ci_state(self, sha):
-        return "success"
+        return self.ci
+
+    def enable_auto_merge(self, pr):
+        self.auto_merge.append(pr["number"])
 
     def merge(self, n, severity, approved, human):
         invariants.check_merge_allowed(severity, approved, human)
@@ -173,9 +178,11 @@ class FakeJira:
 
 @pytest.fixture
 def company(monkeypatch, manifest_dbt_dir, tmp_path):
-    def run(name: str, approve: bool = True, confirm: bool = True, mode: str = "protect"):
+    def run(name: str, approve: bool | None = True, confirm: bool | None = True, mode: str = "protect",
+            channel: str = "cli", ci: str = "success"):
         sc = {f.__name__: f for f in S.ALL}[name]()
         wh, gh, jr = FakeWarehouse(sc), FakeGitHub(manifest_dbt_dir, tmp_path / name), FakeJira()
+        gh.ci = ci
         monkeypatch.setattr("sdis.context.Context.wh", property(lambda self: wh), raising=False)
         monkeypatch.setattr("sdis.context.Context.github", property(lambda self: gh), raising=False)
         monkeypatch.setattr("sdis.context.Context.jira", property(lambda self: jr), raising=False)
@@ -184,8 +191,10 @@ def company(monkeypatch, manifest_dbt_dir, tmp_path):
         s = Settings()
         s.repo_dir = manifest_dbt_dir.parent
         s.mode = mode
+        s.approval_channel = channel
         s.trace_path = tmp_path / "trace.jsonl"
         outs = run_local(s, approve=approve, confirm=confirm)
+        run.settings = s
         return outs, wh, gh, jr
     return run
 
@@ -255,3 +264,44 @@ def test_agents_never_write_raw(company):
     _, wh, _, _ = company("breaking", approve=False)
     for sql in wh.sql_log:
         invariants.check_sql_is_safe(sql)
+
+
+# ---------------------------------------------------------------------------- serverless (GitHub Actions)
+def test_github_channel_rename_waits_for_human_merge_then_auditor_resolves(company):
+    from sdis.context import Task
+    from sdis.runner import incident_from_branch, run_task
+    outs, wh, gh, jr = company("rename", approve=None, confirm=None, channel="github")
+    surgeon = next(o for o in outs if o.agent == "surgeon")
+    assert surgeon.status == "waiting" and gh.merged == [] and gh.auto_merge == []
+    assert "merging this PR is the human approval" in gh.prs[1]["body"]
+    assert wh.gate[S.NEW_LOAD] == "PENDING"
+    # a human merges the PR on GitHub → sdis-on-merge.yml → `sdis on-merge --branch sdis/inc-…`
+    inc = incident_from_branch("sdis/" + next(iter(wh.incidents)).lower() + "-rename")
+    out = run_task(Task(agent="auditor", title="", description="", incident_id=inc, meta={"approved": "true"}),
+                   company.settings)
+    assert out[0].status == "success" and wh.gate[S.NEW_LOAD] == "PASSED"
+    assert wh.incidents[inc]["STATUS"] == "RESOLVED"
+
+
+def test_github_channel_sev4_enables_auto_merge_instead_of_polling(company):
+    outs, wh, gh, _ = company("additive", approve=None, confirm=None, channel="github", ci="pending")
+    assert gh.auto_merge == [1] and gh.merged == []
+    assert any(d["decision"] == "auto_merge" for o in outs for d in o.decisions)
+
+
+def test_github_channel_semantic_waits_for_producer_dispatch(company):
+    from sdis.context import Task
+    from sdis.runner import run_task
+    outs, wh, gh, jr = company("semantic", approve=None, confirm=None, channel="github")
+    assert next(o for o in outs if o.agent == "diplomat").status == "waiting" and gh.prs == {}
+    inc = next(iter(wh.incidents))
+    # the producer answers via sdis-producer.yml → `sdis producer INC --confirm`
+    out = run_task(Task(agent="diplomat", title="", description="", incident_id=inc), company.settings, confirm=True)
+    assert [o.agent for o in out] == ["diplomat", "surgeon"]
+    assert gh.prs[1]["title"].startswith("[SEV1]") and gh.merged == []
+
+
+def test_incident_from_branch():
+    from sdis.runner import incident_from_branch
+    assert incident_from_branch("refs/heads/sdis/inc-b1a85bd8-rename") == "INC-B1A85BD8"
+    assert incident_from_branch("feature/x") is None

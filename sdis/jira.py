@@ -82,7 +82,7 @@ class Jira:
         payload = {"fields": {
             "project": {"key": self.s.jira_project_key},
             "issuetype": {"name": self.s.jira_issue_type},
-            "summary": headline(d)[:250],
+            "summary": f"[{d.incident_id}] {headline(d)}"[:250],  # id first: Jira Automation can match it
             "description": adf_description(d, narrative, pr_url, producer_note(d, owner)),
             "labels": ["sdis", f"sdis-{d.top_class}", d.severity.lower(), d.incident_id.lower()],
         }}

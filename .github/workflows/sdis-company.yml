@@ -1,0 +1,75 @@
+# =============================================================================
+# The SDIS company, serverless and free: GitHub Actions is the runtime.
+#   schedule  → Sentinel scans RAW; drift flows Diagnostician → Surgeon / Diplomat in the same run
+#   dispatch  → run it now (e.g. right after landing a demo scenario in Snowflake)
+# Approvals: SEV1/SEV2 PRs wait for a human merge (merge = approval); SEV3/SEV4 PRs auto-merge on green CI.
+# Merges trigger sdis-on-merge.yml (Auditor); producer answers trigger sdis-producer.yml.
+# Set repository variable SDIS_RUNTIME=paperclip to pause the schedule while Paperclip runs the company.
+# =============================================================================
+name: sdis-company
+
+on:
+  schedule:
+    # Every 3 hours. Each run resumes the XS warehouse for ~1 minute, so this stays well inside the
+    # 10-credit SDIS_RM monitor. Use "Run workflow" for demos instead of a tighter schedule.
+    - cron: "17 */3 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "SDIS_MODE (observe | advise | protect)"
+        default: protect
+        type: choice
+        options: [protect, advise, observe]
+
+concurrency:
+  group: sdis-company
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    if: github.event_name == 'workflow_dispatch' || vars.SDIS_RUNTIME != 'paperclip'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SDIS_APPROVAL_CHANNEL: github
+      SDIS_MODE: ${{ inputs.mode || vars.SDIS_MODE || 'protect' }}
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_PRIVATE_KEY_PATH: ${{ github.workspace }}/../keys/sdis_agent.p8
+      SNOWFLAKE_DBT_PRIVATE_KEY_PATH: ${{ github.workspace }}/../keys/sdis_dbt.p8
+      GITHUB_TOKEN: ${{ secrets.SDIS_GITHUB_TOKEN }}   # fine-grained PAT so Surgeon PRs trigger CI
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+      DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0, token: "${{ secrets.SDIS_GITHUB_TOKEN || github.token }}"}
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12", cache: pip}
+      - run: pip install -e .
+      - name: Keys from secrets (never committed)
+        run: |
+          mkdir -p ../keys
+          printf '%s\n' "${{ secrets.SNOWFLAKE_AGENT_PRIVATE_KEY }}" > ../keys/sdis_agent.p8
+          printf '%s\n' "${{ secrets.SNOWFLAKE_DBT_PRIVATE_KEY }}" > ../keys/sdis_dbt.p8
+          chmod 600 ../keys/*.p8
+      - name: dbt parse (lineage for blast radius)
+        working-directory: dbt
+        run: dbt parse --profiles-dir . --quiet
+      - name: Run the company (Sentinel → Diagnostician → Surgeon / Diplomat)
+        run: sdis run | tee run.json
+      - name: Summary
+        if: always()
+        run: |
+          echo "### SDIS run (${SDIS_MODE})" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"; cat run.json >> "$GITHUB_STEP_SUMMARY" || true; echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sdis-trace-${{ github.run_id }}
+          path: traces/
+          if-no-files-found: ignore
+          retention-days: 30

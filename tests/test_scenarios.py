@@ -70,3 +70,26 @@ def test_incident_ids_are_stable():
     assert d.incident_id == decide("rename")[1].incident_id
     assert d.incident_id.startswith("INC-") and len(d.incident_id) == 12
     assert S.NEW_LOAD in d.load_id
+
+
+def test_lineage_snapshot_matches_dbt(manifest_dbt_dir):
+    """The committed lineage (used where dbt isn't installed, e.g. Streamlit Cloud) must match the project."""
+    import json
+
+    from sdis.blast_radius import LINEAGE_SNAPSHOT, load_manifest, slim_manifest
+    assert json.loads(LINEAGE_SNAPSHOT.read_text()) == json.loads(json.dumps(slim_manifest(
+        load_manifest(manifest_dbt_dir)))), "run `sdis lineage-snapshot`"
+
+
+def test_demo_mode_without_dbt_or_git(monkeypatch, tmp_path):
+    """Streamlit Community Cloud path: no dbt binary, no git → snapshot lineage + difflib diff."""
+    import shutil
+
+    from sdis import simulate
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+    dbt = tmp_path / "dbt"
+    shutil.copytree(simulate.REPO_ROOT / "dbt", dbt, ignore=shutil.ignore_patterns("target", "logs"))
+    _, d = simulate.decide("rename", dbt)
+    assert d.blast_radius.tier == "high" and len(d.blast_radius.exposures) == 4
+    _, diff = simulate.patch_preview(d, dbt)
+    assert "+        cast(CUSTOMER_ID as number(38,0)) as cust_id," in diff

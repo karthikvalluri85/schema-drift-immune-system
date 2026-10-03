@@ -26,13 +26,17 @@ BREAKING_PROFILES = {"baseline_top_k": {"STATUS": {"C": 0.8, "A": 0.2}},
 
 
 def _ensure_manifest(dbt_dir: Path) -> dict[str, Any] | None:
+    """Real dbt manifest when available; otherwise the committed lineage snapshot (e.g. on Streamlit Cloud)."""
+    from .blast_radius import LINEAGE_SNAPSHOT
     mf = dbt_dir / "target" / "manifest.json"
+    if not mf.exists() and not shutil.which("dbt"):
+        return json.loads(LINEAGE_SNAPSHOT.read_text())
     if not mf.exists():
         env = {**os.environ, "DBT_SEND_ANONYMOUS_USAGE_STATS": "false",
                "SNOWFLAKE_ACCOUNT": os.environ.get("SNOWFLAKE_ACCOUNT", "offline"),
                "SNOWFLAKE_PRIVATE_KEY_PATH": os.environ.get("SNOWFLAKE_PRIVATE_KEY_PATH", "/dev/null")}
         subprocess.run(["dbt", "parse", "--profiles-dir", ".", "--quiet"], cwd=dbt_dir, env=env, capture_output=True)
-    return json.loads(mf.read_text()) if mf.exists() else None
+    return json.loads(mf.read_text()) if mf.exists() else json.loads(LINEAGE_SNAPSHOT.read_text())
 
 
 def decide(name: str, dbt_dir: Path | None = None) -> tuple[S.Scenario, RouteDecision]:
@@ -63,9 +67,28 @@ def patch_preview(d: RouteDecision, dbt_dir: Path | None = None) -> tuple[surgeo
             d.surgeon_action = "normalize_after_confirmation"
             kw = {"confirmed": True}
         p = surgeon.build_patch(b / "dbt", d, **kw)
-        diff = subprocess.run(["git", "diff", "--no-index", "--no-color", "a/dbt", "b/dbt"], cwd=tmp,
-                              capture_output=True, text=True).stdout
+        diff = _diff(Path(tmp))
     return p, diff
+
+
+def _diff(tmp: Path) -> str:
+    """git's unified diff when git exists, else difflib (Streamlit Cloud and other minimal hosts)."""
+    if shutil.which("git"):
+        return subprocess.run(["git", "diff", "--no-index", "--no-color", "a/dbt", "b/dbt"], cwd=tmp,
+                              capture_output=True, text=True).stdout
+    import difflib
+    out: list[str] = []
+    for nb in sorted((tmp / "b" / "dbt").rglob("*")):
+        if not nb.is_file():
+            continue
+        rel = nb.relative_to(tmp / "b")
+        na = tmp / "a" / rel
+        old = na.read_text().splitlines(keepends=True) if na.exists() else []
+        new = nb.read_text().splitlines(keepends=True)
+        if old != new:
+            out.append(f"diff --git a/a/{rel} b/b/{rel}\n")
+            out.extend(difflib.unified_diff(old, new, f"a/a/{rel}", f"b/b/{rel}"))
+    return "".join(out)
 
 
 def story(d: RouteDecision) -> list[str]:

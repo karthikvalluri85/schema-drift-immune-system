@@ -92,5 +92,19 @@ class GitHub:
             self._req("PATCH", f"/pulls/{number}", json={"draft": False})
         return self._req("PUT", f"/pulls/{number}/merge", json={"merge_method": "squash"})
 
+    def enable_auto_merge(self, pr: dict[str, Any]) -> None:
+        """Let GitHub merge the PR itself once every required check is green (repo setting 'Allow auto-merge').
+
+        Used by the serverless runtime for SEV3/SEV4 fixes: no agent needs to stay awake waiting for CI.
+        Branch protection still enforces tests-before-merge, so the invariant holds on GitHub's side.
+        """
+        q = ("mutation($id: ID!) { enablePullRequestAutoMerge(input: {pullRequestId: $id, mergeMethod: SQUASH}) "
+             "{ pullRequest { number autoMergeRequest { enabledAt } } } }")
+        r = requests.post(f"{API}/graphql", headers=self._h(), timeout=30,
+                          json={"query": q, "variables": {"id": pr["node_id"]}})
+        r.raise_for_status()
+        if r.json().get("errors"):
+            raise RuntimeError(f"auto-merge not enabled: {r.json()['errors'][0].get('message')}")
+
     def comment(self, number: int, body: str) -> None:
         self._req("POST", f"/issues/{number}/comments", json={"body": body})

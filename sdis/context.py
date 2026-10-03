@@ -116,9 +116,17 @@ class Context:
                 self.paperclip.request_confirmation(issue_id, prompt, key)
                 return "pending"
             return {"accepted": "accepted", "approved": "accepted", "rejected": "rejected"}.get(state, "pending")
-        preset = self.confirm_producer if kind == "producer" else self.approve
+        if self.settings.approval_channel == "github":
+            # Serverless: nobody is at a terminal. A human approves by merging the PR (SEV1/SEV2 PRs are
+            # labelled needs-human and never auto-merged); a producer confirms via the sdis-producer workflow.
+            preset = self.confirm_producer if kind == "producer" else None
+            if preset is None:
+                self.say(f"   ⏸️  waiting for a human on GitHub: {prompt}")
+                return "pending"
+        else:
+            preset = self.confirm_producer if kind == "producer" else self.approve
         if preset is not None:
-            self.say(f"   🧑 {prompt}  →  {'yes (preset)' if preset else 'no (preset)'}")
+            self.say(f"   🧑 {prompt}  →  {'yes' if preset else 'no'} ({self.settings.approval_channel})")
             return "accepted" if preset else "rejected"
         answer = input(f"\n   🧑 {prompt} [y/N] ").strip().lower()
         return "accepted" if answer in ("y", "yes") else "rejected"

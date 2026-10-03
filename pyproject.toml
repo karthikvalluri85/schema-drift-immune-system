@@ -30,6 +30,9 @@ sdis = "sdis.cli:main"
 [tool.setuptools.packages.find]
 include = ["sdis*"]
 
+[tool.setuptools.package-data]
+sdis = ["data/*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 filterwarnings = ["ignore::DeprecationWarning", "ignore:.*RequestsDependencyWarning.*"]

@@ -18,8 +18,26 @@ import yaml
 from .models import BlastRadius, DriftEvent
 
 
+LINEAGE_SNAPSHOT = Path(__file__).resolve().parent / "data" / "lineage.json"
+
+
 def load_manifest(dbt_dir: Path) -> dict[str, Any]:
     return json.loads((dbt_dir / "target" / "manifest.json").read_text())
+
+
+def slim_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Just the lineage SDIS needs (models, exposures, edges) — committed so demo mode runs without dbt."""
+    keep = lambda n: n.startswith(("model.", "exposure.", "source."))  # noqa: E731
+    return {
+        "metadata": {"project_name": manifest["metadata"].get("project_name")},
+        "nodes": {k: {"name": v["name"]} for k, v in sorted(manifest["nodes"].items()) if k.startswith("model.")},
+        "child_map": {k: sorted(c for c in v if keep(c)) for k, v in sorted(manifest.get("child_map", {}).items())
+                      if keep(k)},
+        "exposures": {k: {"name": v["name"], "label": v.get("label"), "type": v.get("type"),
+                          "owner": {"name": (v.get("owner") or {}).get("name")},
+                          "config": {"meta": {**(v.get("meta") or {}), **((v.get("config") or {}).get("meta") or {})}}}
+                      for k, v in sorted(manifest.get("exposures", {}).items())},
+    }
 
 
 def staging_models_reading(dbt_dir: Path, table: str, columns: set[str]) -> list[str]:
