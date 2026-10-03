@@ -17,7 +17,6 @@ import yaml
 
 from .models import BlastRadius, DriftEvent
 
-
 LINEAGE_SNAPSHOT = Path(__file__).resolve().parent / "data" / "lineage.json"
 
 

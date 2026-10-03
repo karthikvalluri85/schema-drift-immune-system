@@ -17,6 +17,6 @@ traces/
 *.p8
 *.pem
 keys/
-data/
+/data/
 .streamlit/secrets.toml
 dbt/.user.yml
