@@ -21,3 +21,4 @@ keys/
 .streamlit/secrets.toml
 dbt/.user.yml
 .sdis-demo/
+blog-assets/
