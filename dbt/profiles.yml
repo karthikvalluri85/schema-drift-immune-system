@@ -7,7 +7,8 @@ sdis:
       type: snowflake
       account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
       user: "{{ env_var('SNOWFLAKE_DBT_USER', 'SDIS_DBT_SVC') }}"
-      private_key_path: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PATH') }}"
+      # dbt signs in as SDIS_DBT_SVC with its own key; falls back to SNOWFLAKE_PRIVATE_KEY_PATH (CI sets that one)
+      private_key_path: "{{ env_var('SNOWFLAKE_DBT_PRIVATE_KEY_PATH', env_var('SNOWFLAKE_PRIVATE_KEY_PATH', '')) }}"
       role: SDIS_TRANSFORM_ROLE
       warehouse: SDIS_WH
       database: SDIS_DB
