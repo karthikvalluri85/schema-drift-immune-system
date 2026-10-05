@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip}
       - run: pip install -e ".[api,dashboard,dev]"
       - name: Lint
@@ -62,7 +62,7 @@ jobs:
       - if: steps.creds.outputs.present != 'true'
         run: echo "::notice::Snowflake secrets not configured — skipping Slim CI dbt build"
       - if: steps.creds.outputs.present == 'true'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip}
       - if: steps.creds.outputs.present == 'true'
         run: |
@@ -128,7 +128,7 @@ jobs:
       - id: creds
         run: echo "present=${{ env.SNOWFLAKE_ACCOUNT != '' }}" >> "$GITHUB_OUTPUT"
       - if: steps.creds.outputs.present == 'true'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip}
       - if: steps.creds.outputs.present == 'true'
         run: |

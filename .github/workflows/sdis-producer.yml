@@ -38,7 +38,7 @@ jobs:
           case "$ANSWER" in confirm|reject) ;; *) echo "bad answer: $ANSWER"; exit 1;; esac
       - uses: actions/checkout@v4
         with: {fetch-depth: 0, token: "${{ secrets.SDIS_GITHUB_TOKEN || github.token }}"}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with: {python-version: "3.12", cache: pip}
       - run: pip install -e .
       - run: |
