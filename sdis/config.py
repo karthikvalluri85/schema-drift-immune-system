@@ -8,6 +8,27 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
+def load_dotenv(path: Path) -> list[str]:
+    """Fill *unset* env vars from a git-ignored .env (KEY=VALUE lines). Never overrides real env.
+
+    Paperclip's process adapter only passes the plain vars `paperclip_setup.py` forwards; secrets
+    (GITHUB_TOKEN, JIRA_API_TOKEN) stay in the local .env instead of Paperclip's database.
+    """
+    loaded: list[str] = []
+    if not path.is_file():
+        return loaded
+    for raw in path.read_text(encoding="utf-8-sig").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, val = line.split("=", 1)
+        key, val = key.strip(), val.strip().strip('"').strip("'")
+        if key.isidentifier() and val and not os.environ.get(key):
+            os.environ[key] = val
+            loaded.append(key)
+    return loaded
+
+
 def _env(name: str, default: str | None = None) -> str | None:
     v = os.environ.get(name)
     return v if v not in (None, "") else default

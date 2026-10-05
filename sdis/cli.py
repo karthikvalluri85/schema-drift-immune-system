@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+from pathlib import Path
 
-from .config import Settings
+from .config import REPO_ROOT, Settings, load_dotenv
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -47,6 +49,8 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--confirm", action="store_true")
     g.add_argument("--reject", action="store_true")
     a = p.parse_args(argv)
+    if a.cmd == "heartbeat":  # woken by Paperclip: pick up GitHub/Jira secrets from the repo's .env
+        load_dotenv(Path(os.environ.get("SDIS_REPO_DIR") or REPO_ROOT) / ".env")
     s = Settings()
 
     if a.cmd == "codegen":
