@@ -16,7 +16,7 @@ columns:
   - unique
   description: Order identifier
 - alias: cust_id
-  source: CUST_ID
+  source: CUSTOMER_ID
   type: number(38,0)
   tests:
   - not_null

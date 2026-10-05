@@ -17,8 +17,11 @@ sources:
     columns:
     - name: ORDER_ID
       data_type: number(38,0)
-    - name: CUST_ID
+    - name: CUSTOMER_ID
       data_type: number(38,0)
+      config:
+        meta:
+          sdis_renamed_from: CUST_ID
     - name: ORDER_TS
       data_type: timestamp_ntz
     - name: AMOUNT

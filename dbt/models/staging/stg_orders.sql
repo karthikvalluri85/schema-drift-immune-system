@@ -8,7 +8,7 @@ with source as (
 mapped as (
     select
         cast(ORDER_ID as number(38,0)) as order_id,
-        cast(CUST_ID as number(38,0)) as cust_id,
+        cast(CUSTOMER_ID as number(38,0)) as cust_id,
         cast(ORDER_TS as timestamp_ntz) as order_ts,
         cast(AMOUNT as number(10,2)) as amount_inr,
         cast(STATUS as varchar) as status,
