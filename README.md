@@ -8,6 +8,13 @@ Built on **Snowflake** (Bronze/control plane, MINHASH + HLL fingerprints, Cortex
 > SDIS holds the new load, proves it is a rename by matching the column's *values*, opens a one-line PR that keeps every downstream model unchanged, files a Jira ticket with the blast radius, and waits for a human to approve because it's SEV1.
 > **Time to contain: under a minute. Time to resolve: one approval.**
 
+<p align="center">
+  <img src="docs/assets/sdis-demo.gif" alt="17-second demo: the SDIS agent company in Paperclip handles a CUST_ID rename — org chart, live heartbeats, the Diagnostician's decisions, a human approval, the Auditor resolving, and $0 agent spend" width="820" />
+  <br/>
+  <sub>The rename incident end to end in Paperclip (17 s). Real agents and real Paperclip heartbeats, in credential-free demo mode.
+  <a href="docs/assets/sdis-demo.mp4">MP4</a> · re-record with <code>python scripts/record_demo.py</code></sub>
+</p>
+
 ---
 
 ## The five kinds of drift — and what the company does
@@ -58,9 +65,19 @@ flowchart LR
 ```bash
 pip install -e ".[api,dashboard,dev]"
 sdis simulate rename          # the real engine on fixture data: decision, blast radius, the PR diff
-pytest -q                     # 85 tests: all 5 scenarios end to end, invariants, API, dashboard, Paperclip package
+pytest -q                     # 98 tests: all 5 scenarios end to end, invariants, API, dashboard, Paperclip package
 uvicorn sdis.api:app --reload # → http://localhost:8000/docs
 streamlit run streamlit/streamlit_app.py   # demo mode dashboard
+```
+
+**Watch the company work in Paperclip, still with no credentials:**
+
+```bash
+PAPERCLIP_HOME=$(mktemp -d) npx paperclipai onboard --yes        # throwaway Paperclip on :3100
+npx paperclipai company import ./company --target new --yes
+sdis demo land rename                                              # land the rename scenario
+python scripts/paperclip_setup.py --activate --demo rename         # agents use recorded data
+# Paperclip → Routines → Schema watch → Run, then approve the Surgeon's fix on its task
 ```
 
 Then follow **[docs/GUIDE.md](docs/GUIDE.md)** for Snowflake, Paperclip, GitHub/Jira, the live demo and FastAPI.

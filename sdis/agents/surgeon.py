@@ -13,7 +13,7 @@ import re
 from .. import surgeon as patcher
 from ..context import Context, Task
 from ..models import AgentOutput, decision
-from ..report import headline, markdown
+from ..report import headline, markdown, title
 
 AGENT = "surgeon"
 
@@ -64,7 +64,7 @@ def handle(ctx: Context, task: Task) -> AgentOutput:
                                        f"sdis({d.top_class}): {headline(d)}\n\nIncident {inc}")
             ctx.github.drop_worktree(wt)
             labels = ["sdis", f"drift:{d.top_class}", d.severity.lower()] + (["needs-human"] if d.requires_human_approval else [])
-            pr = ctx.github.open_pr(branch, f"[{d.severity}] {headline(d)}",
+            pr = ctx.github.open_pr(branch, title(d),
                                     markdown(d, row.get("NARRATIVE"), extra), patch.draft, labels)
             pr_url = pr["html_url"]
             ctx.wh.update_incident(inc, pr_url=pr_url)

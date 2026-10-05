@@ -52,6 +52,7 @@ class Settings:
     #   cli    → asked in the terminal (or pre-answered with --approve / --confirm-producer)
     #   github → serverless runtime: merging the PR IS the approval (branch protection requires a review);
     #            producer confirmations arrive as a workflow_dispatch / repository_dispatch event
+    demo: str | None = field(default_factory=lambda: _env("SDIS_DEMO"))  # scenario name → credential-free demo
     approval_channel: str = field(default_factory=lambda: _env("SDIS_APPROVAL_CHANNEL", "cli").lower())
     dry_run: bool = field(default_factory=lambda: _env("SDIS_DRY_RUN", "false").lower() == "true")
     trace_path: Path = field(default_factory=lambda: Path(_env("SDIS_TRACE_PATH", "traces/trace_events.jsonl")))

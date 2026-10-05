@@ -342,6 +342,20 @@ Run it with `streamlit run streamlit/streamlit_app.py`. Without Snowflake env va
 
 ---
 
+### 8.5 The 17-second demo GIF (and demo mode)
+
+`docs/assets/sdis-demo.gif` (top of the README) and `docs/assets/sdis-demo.mp4` were recorded from a real Paperclip
+run. The six scenes are: org chart → task tree → the Diagnostician's decisions → the approval card → live heartbeats → resolved + budget.
+They come from **demo mode** (`SDIS_DEMO=rename`): the real agents, playbooks and heartbeats, with Snowflake, GitHub
+and Jira swapped for recorded data, so anyone can watch the company work without accounts.
+
+- **Try it:** see "Watch the company work in Paperclip" in the README.
+- **Re-record:** `python scripts/record_demo.py` (needs a throwaway Paperclip, Playwright Chromium and ffmpeg). It
+  re-imports the company, lands the rename scenario, clicks Approve like a human would, and cuts the take to exactly
+  17 s. Captions are overlaid in the page; scene boundaries are found from colour markers in the video itself.
+- **LinkedIn:** the GIF is under 5 MB. Upload it with the **photo** button so it stays animated, or post the MP4 as a
+  video. In a blog or GitHub README, the GIF autoplays.
+
 ## 9. Taking it to a real production platform
 
 Adopt it in three steps of increasing trust (`SDIS_MODE`):

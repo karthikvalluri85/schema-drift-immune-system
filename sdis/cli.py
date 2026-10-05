@@ -35,6 +35,9 @@ def main(argv: list[str] | None = None) -> int:
     sim.add_argument("scenario", choices=["additive", "rename", "type_widening", "breaking", "semantic", "all"])
     sim.add_argument("--json", action="store_true")
     sub.add_parser("ledger")
+    dm = sub.add_parser("demo", help="credential-free demo: land a scenario / show demo state")
+    dm.add_argument("action", choices=["land", "status"])
+    dm.add_argument("scenario", nargs="?", default="rename")
     sub.add_parser("lineage-snapshot", help="refresh sdis/data/lineage.json from dbt/target/manifest.json")
     om = sub.add_parser("on-merge", help="serverless: an sdis/inc-… PR was merged → Auditor verifies and resolves")
     om.add_argument("--branch", required=True)
@@ -69,6 +72,15 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "heartbeat":
         from .runner import heartbeat
         heartbeat(a.agent, s)
+        return 0
+    if a.cmd == "demo":
+        from . import demo
+        if a.action == "land":
+            demo.land(a.scenario)
+            print(f"landed '{a.scenario}' (load {__import__('sdis.scenarios', fromlist=['x']).NEW_LOAD}) in "
+                  f"{demo.state_path()}. Run agents with SDIS_DEMO={a.scenario}.")
+        else:
+            print(json.dumps(demo.status(), indent=2, default=str))
         return 0
     if a.cmd == "lineage-snapshot":
         from .blast_radius import LINEAGE_SNAPSHOT, load_manifest, slim_manifest

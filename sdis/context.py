@@ -50,6 +50,9 @@ class Context:
 
     @cached_property
     def wh(self):
+        if self.settings.demo:
+            from .demo import DemoWarehouse
+            return DemoWarehouse(self.agent)
         from .warehouse import Warehouse
         return Warehouse(self.settings, self.agent)
 
@@ -59,10 +62,16 @@ class Context:
 
     @cached_property
     def github(self) -> GitHub:
+        if self.settings.demo:
+            from .demo import DemoGitHub
+            return DemoGitHub(self.settings)  # type: ignore[return-value]
         return GitHub(self.settings)
 
     @cached_property
     def jira(self) -> Jira:
+        if self.settings.demo:
+            from .demo import DemoJira
+            return DemoJira(self.settings)  # type: ignore[return-value]
         return Jira(self.settings)
 
     @cached_property
@@ -87,8 +96,12 @@ class Context:
 
     def manifest(self, dbt_dir: Path | None = None) -> dict[str, Any] | None:
         import json
+
+        from .blast_radius import LINEAGE_SNAPSHOT
         p = (dbt_dir or self.settings.dbt_dir) / "target" / "manifest.json"
-        return json.loads(p.read_text()) if p.exists() else None
+        if p.exists():
+            return json.loads(p.read_text())
+        return json.loads(LINEAGE_SNAPSHOT.read_text()) if self.settings.demo else None
 
     # ------------------------------------------------------------------ delegation + approvals
     def say(self, msg: str) -> None:

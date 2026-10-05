@@ -1,7 +1,9 @@
 """Runs agents either under a Paperclip heartbeat or as a local synchronous pipeline."""
 from __future__ import annotations
 
+import os
 import re
+import time
 import traceback
 from typing import Any
 
@@ -12,7 +14,9 @@ from .config import Settings
 from .context import Context, Task
 from .models import AgentOutput
 
-STATUS_TO_PAPERCLIP = {"success": "done", "noop": "done", "waiting": "in_progress", "blocked": "blocked",
+# "waiting" (on a human approval or on CI) is Paperclip's `blocked`: the issue shows the pending confirmation
+# card, and the agent's next heartbeat (or the confirmation's wake_assignee) picks it up again.
+STATUS_TO_PAPERCLIP = {"success": "done", "noop": "done", "waiting": "blocked", "blocked": "blocked",
                        "failed": "blocked"}
 _META = re.compile(r"^sdis-([a-z_]+):\s*(.+)$", re.M)
 
@@ -54,6 +58,9 @@ def heartbeat(agent: str, settings: Settings | None = None) -> int:
     pc = ctx.paperclip
     if not pc.enabled:
         raise SystemExit("PAPERCLIP_API_URL / PAPERCLIP_API_KEY not set — run under a Paperclip heartbeat or use `sdis run`")
+    pace = float(os.environ.get("SDIS_DEMO_PACE", "0") or 0) if s.demo else 0.0
+    if pace:
+        time.sleep(pace)  # demo recordings only: let viewers see each agent's live run
     me = pc.me()
     mode = invariants.budget_mode(int(me.get("spentMonthlyCents") or 0), int(me.get("budgetMonthlyCents") or 0))
     if mode == "paused":
@@ -71,7 +78,8 @@ def heartbeat(agent: str, settings: Settings | None = None) -> int:
         except Exception as exc:  # 409 Conflict → someone else owns it; never retry
             ctx.tracer.emit("operational", "checkout_skipped", None, issue=issue.get("id"), reason=repr(exc))
             continue
-        task = task_from_issue(agent, issue)
+        # list results carry shortened descriptions; the incident marker sits at the end, so read the full issue
+        task = task_from_issue(agent, pc.issue(issue["id"]))
         try:
             out = HANDLERS[agent](ctx, task)
             _finish(ctx, out)

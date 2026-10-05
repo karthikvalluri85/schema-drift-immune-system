@@ -37,6 +37,11 @@ def headline(d: RouteDecision) -> str:
     return f"{SEV_EMOJI.get(d.severity, '')} {d.severity} {CLASS_LABEL[d.top_class]} on {table}: {what}".strip()
 
 
+def title(d: RouteDecision) -> str:
+    """Plain one-line title for PRs: `[SEV1] Rename on ORDERS: CUST_ID → CUSTOMER_ID`."""
+    return f"[{d.severity}] " + headline(d).split(f"{d.severity} ", 1)[-1]
+
+
 def markdown(d: RouteDecision, narrative: str | None = None, extra: str | None = None) -> str:
     b = d.blast_radius
     lines = [f"## {headline(d)}", "",

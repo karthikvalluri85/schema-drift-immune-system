@@ -12,6 +12,7 @@ the rest of `company/.paperclip.yaml` through the Paperclip REST API:
 Usage:
     python scripts/paperclip_setup.py                 # configure, leave agents paused
     python scripts/paperclip_setup.py --activate      # also enable heartbeats and resume agents
+    python scripts/paperclip_setup.py --activate --demo rename   # no credentials: watch the company work
     PAPERCLIP_URL=https://paperclip.<ip>.sslip.io PAPERCLIP_TOKEN=... python scripts/paperclip_setup.py
 """
 from __future__ import annotations
@@ -50,6 +51,8 @@ def main() -> int:
     ap.add_argument("--token", default=os.environ.get("PAPERCLIP_TOKEN"))
     ap.add_argument("--repo-dir", default=os.environ.get("SDIS_REPO_DIR", str(ROOT)))
     ap.add_argument("--activate", action="store_true", help="enable heartbeats and resume agents")
+    ap.add_argument("--demo", metavar="SCENARIO",
+                    help="credential-free demo mode (e.g. rename): agents use sdis.demo instead of Snowflake/GitHub/Jira")
     a = ap.parse_args()
     call = api(a.url.rstrip("/"), a.token)
 
@@ -76,7 +79,10 @@ def main() -> int:
         hb["enabled"] = bool(a.activate and hb.get("enabled", True))
         body: dict = {"runtimeConfig": {"heartbeat": hb}, "budgetMonthlyCents": int(cfg.get("budgetMonthlyCents", 0))}
         if cfg["adapter"]["type"] == "process":
-            env = {"SDIS_REPO_DIR": a.repo_dir}
+            env = {"SDIS_REPO_DIR": a.repo_dir, "PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin")}
+            if a.demo:
+                env |= {"SDIS_DEMO": a.demo,
+                        "SDIS_DEMO_STATE": os.environ.get("SDIS_DEMO_STATE", f"{a.repo_dir}/.sdis-demo/state.pkl")}
             for k in ("SNOWFLAKE_ACCOUNT", "SNOWFLAKE_USER", "SNOWFLAKE_PRIVATE_KEY_PATH", "SDIS_CORTEX_MODEL",
                       "GITHUB_REPOSITORY", "JIRA_BASE_URL", "JIRA_EMAIL", "JIRA_PROJECT_KEY"):
                 if os.environ.get(k):
