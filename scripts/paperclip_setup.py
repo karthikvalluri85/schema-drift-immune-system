@@ -82,7 +82,7 @@ def main() -> int:
             env = {"SDIS_REPO_DIR": a.repo_dir, "PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin")}
             if a.demo:
                 env |= {"SDIS_DEMO": a.demo,
-                        "SDIS_DEMO_STATE": os.environ.get("SDIS_DEMO_STATE", f"{a.repo_dir}/.sdis-demo/state.pkl")}
+                        "SDIS_DEMO_STATE": os.environ.get("SDIS_DEMO_STATE", f"{a.repo_dir}/.sdis-demo/state.json")}
             for k in ("SNOWFLAKE_ACCOUNT", "SNOWFLAKE_USER", "SNOWFLAKE_PRIVATE_KEY_PATH", "SDIS_CORTEX_MODEL",
                       "GITHUB_REPOSITORY", "JIRA_BASE_URL", "JIRA_EMAIL", "JIRA_PROJECT_KEY"):
                 if os.environ.get(k):

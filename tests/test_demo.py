@@ -10,7 +10,7 @@ from sdis.runner import run_local, task_from_issue
 
 @pytest.fixture
 def demo_env(monkeypatch, tmp_path):
-    monkeypatch.setenv("SDIS_DEMO_STATE", str(tmp_path / "state.pkl"))
+    monkeypatch.setenv("SDIS_DEMO_STATE", str(tmp_path / "state.json"))
     monkeypatch.setenv("SDIS_DEMO", "rename")
     monkeypatch.delenv("SNOWFLAKE_ACCOUNT", raising=False)
     s = Settings()
