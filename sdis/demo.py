@@ -79,7 +79,7 @@ class _Store:
             p.parent.mkdir(parents=True, exist_ok=True)
             cls._lock_fh = open(p.with_suffix(".lock"), "w")  # noqa: SIM115 — held until exit
             fcntl.flock(cls._lock_fh, fcntl.LOCK_EX)
-            cls._data = _load(p.read_text()) if p.exists() else {}
+            cls._data = _load(p.read_text(encoding="utf-8")) if p.exists() else {}
             if not cls._hooked:
                 atexit.register(cls.save)
                 cls._hooked = True
@@ -88,7 +88,7 @@ class _Store:
     @classmethod
     def save(cls) -> None:
         if cls._data is not None and cls._path is not None:
-            cls._path.write_text(_dump(cls._data))
+            cls._path.write_text(_dump(cls._data), encoding="utf-8")
         if cls._lock_fh is not None:
             fcntl.flock(cls._lock_fh, fcntl.LOCK_UN)
             cls._lock_fh.close()
@@ -244,7 +244,7 @@ class DemoGitHub:
 
     def commit_and_push(self, wt, branch, files, message):
         for f in files:
-            invariants.check_no_secrets(Path(f).read_text(), where=f)
+            invariants.check_no_secrets(Path(f).read_text(encoding="utf-8"), where=f)
         return "demo0000"
 
     def drop_worktree(self, wt):

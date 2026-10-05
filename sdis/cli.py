@@ -89,7 +89,7 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "lineage-snapshot":
         from .blast_radius import LINEAGE_SNAPSHOT, load_manifest, slim_manifest
         LINEAGE_SNAPSHOT.parent.mkdir(parents=True, exist_ok=True)
-        LINEAGE_SNAPSHOT.write_text(json.dumps(slim_manifest(load_manifest(s.dbt_dir)), indent=1, sort_keys=True) + "\n")
+        LINEAGE_SNAPSHOT.write_text(json.dumps(slim_manifest(load_manifest(s.dbt_dir)), indent=1, sort_keys=True) + "\n", encoding="utf-8")
         print(f"wrote {LINEAGE_SNAPSHOT}")
         return 0
     if a.cmd == "on-merge":

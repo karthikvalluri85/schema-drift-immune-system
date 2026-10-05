@@ -11,7 +11,7 @@ def main(path: str) -> None:
     if not p.exists():
         print("_No run_results.json — nothing was built._")
         return
-    res = json.loads(p.read_text())["results"]
+    res = json.loads(p.read_text(encoding="utf-8"))["results"]
     models = sorted(r["unique_id"].split(".")[-1] for r in res if r["unique_id"].startswith("model."))
     tests = [r for r in res if r["unique_id"].startswith("test.")]
     failed = [r["unique_id"] for r in res if r["status"] in ("error", "fail")]

@@ -21,7 +21,7 @@ LINEAGE_SNAPSHOT = Path(__file__).resolve().parent / "data" / "lineage.json"
 
 
 def load_manifest(dbt_dir: Path) -> dict[str, Any]:
-    return json.loads((dbt_dir / "target" / "manifest.json").read_text())
+    return json.loads((dbt_dir / "target" / "manifest.json").read_text(encoding="utf-8"))
 
 
 def slim_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
@@ -43,7 +43,7 @@ def staging_models_reading(dbt_dir: Path, table: str, columns: set[str]) -> list
     """Staging models whose column map reads any of `columns` from RAW `table`."""
     hits = []
     for mp in sorted((dbt_dir / "sdis_maps").glob("*.yml")):
-        m = yaml.safe_load(mp.read_text())
+        m = yaml.safe_load(mp.read_text(encoding="utf-8"))
         if m["source"]["table"].upper() != table.upper():
             continue
         used = {str(c.get("source", "")).upper() for c in m["columns"]}

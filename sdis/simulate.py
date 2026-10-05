@@ -30,13 +30,13 @@ def _ensure_manifest(dbt_dir: Path) -> dict[str, Any] | None:
     from .blast_radius import LINEAGE_SNAPSHOT
     mf = dbt_dir / "target" / "manifest.json"
     if not mf.exists() and not shutil.which("dbt"):
-        return json.loads(LINEAGE_SNAPSHOT.read_text())
+        return json.loads(LINEAGE_SNAPSHOT.read_text(encoding="utf-8"))
     if not mf.exists():
         env = {**os.environ, "DBT_SEND_ANONYMOUS_USAGE_STATS": "false",
                "SNOWFLAKE_ACCOUNT": os.environ.get("SNOWFLAKE_ACCOUNT", "offline"),
                "SNOWFLAKE_PRIVATE_KEY_PATH": os.environ.get("SNOWFLAKE_PRIVATE_KEY_PATH", "/dev/null")}
         subprocess.run(["dbt", "parse", "--profiles-dir", ".", "--quiet"], cwd=dbt_dir, env=env, capture_output=True)
-    return json.loads(mf.read_text()) if mf.exists() else json.loads(LINEAGE_SNAPSHOT.read_text())
+    return json.loads(mf.read_text(encoding="utf-8")) if mf.exists() else json.loads(LINEAGE_SNAPSHOT.read_text(encoding="utf-8"))
 
 
 def decide(name: str, dbt_dir: Path | None = None) -> tuple[S.Scenario, RouteDecision]:
@@ -83,8 +83,8 @@ def _diff(tmp: Path) -> str:
             continue
         rel = nb.relative_to(tmp / "b")
         na = tmp / "a" / rel
-        old = na.read_text().splitlines(keepends=True) if na.exists() else []
-        new = nb.read_text().splitlines(keepends=True)
+        old = na.read_text(encoding="utf-8").splitlines(keepends=True) if na.exists() else []
+        new = nb.read_text(encoding="utf-8").splitlines(keepends=True)
         if old != new:
             out.append(f"diff --git a/a/{rel} b/b/{rel}\n")
             out.extend(difflib.unified_diff(old, new, f"a/a/{rel}", f"b/b/{rel}"))
