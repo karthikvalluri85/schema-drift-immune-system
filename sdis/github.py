@@ -46,7 +46,7 @@ class GitHub:
 
     def commit_and_push(self, wt: Path, branch: str, files: list[str], message: str) -> str:
         for f in files:
-            invariants.check_no_secrets(Path(f).read_text(), where=f)
+            invariants.check_no_secrets(Path(f).read_text(encoding="utf-8"), where=f)
         self._git("add", "-A", "dbt", cwd=wt)
         self._git("-c", f"user.name={BOT_NAME}", "-c", f"user.email={BOT_EMAIL}", "commit", "-m", message, cwd=wt)
         remote = f"https://x-access-token:{self.s.github_token}@github.com/{self.s.github_repo}.git"

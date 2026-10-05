@@ -43,7 +43,7 @@ def _dbt_type(t: str) -> str:
 def _maps_for(dbt_dir: Path, table: str) -> list[tuple[Path, dict[str, Any]]]:
     out = []
     for mp in sorted((dbt_dir / "sdis_maps").glob("*.yml")):
-        m = yaml.safe_load(mp.read_text())
+        m = yaml.safe_load(mp.read_text(encoding="utf-8"))
         if m["source"]["table"].upper() == table.upper():
             out.append((mp, m))
     return out
@@ -51,7 +51,7 @@ def _maps_for(dbt_dir: Path, table: str) -> list[tuple[Path, dict[str, Any]]]:
 
 def _sources(dbt_dir: Path) -> tuple[Path, dict[str, Any]]:
     p = dbt_dir / "models" / "staging" / "_sources.yml"
-    return p, yaml.safe_load(p.read_text())
+    return p, yaml.safe_load(p.read_text(encoding="utf-8"))
 
 
 def _source_table(doc: dict[str, Any], table: str) -> dict[str, Any]:
@@ -64,11 +64,11 @@ def _source_table(doc: dict[str, Any], table: str) -> dict[str, Any]:
 
 def _dump(path: Path, doc: dict[str, Any], header: str | None = None) -> None:
     body = yaml.safe_dump(doc, sort_keys=False, width=120)
-    path.write_text((header + "\n" if header else "") + body)
+    path.write_text((header + "\n" if header else "") + body, encoding="utf-8", newline="\n")
 
 
 def _map_header(path: Path) -> str:
-    return "\n".join(ln for ln in path.read_text().splitlines() if ln.startswith("#"))
+    return "\n".join(ln for ln in path.read_text(encoding="utf-8").splitlines() if ln.startswith("#"))
 
 
 # ---------------------------------------------------------------------------

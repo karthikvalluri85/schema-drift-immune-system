@@ -26,7 +26,7 @@ import requests
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-SIDE = yaml.safe_load((ROOT / "company" / ".paperclip.yaml").read_text())
+SIDE = yaml.safe_load((ROOT / "company" / ".paperclip.yaml").read_text(encoding="utf-8"))
 COMPANY_NAME = "Schema Drift Immune System"
 TASK_TITLES = {"schema-watch": "Schema watch", "weekly-reliability-review": "Weekly reliability review",
                "weekly-cost-ledger": "Weekly cost ledger"}

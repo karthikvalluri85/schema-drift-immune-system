@@ -31,7 +31,7 @@ class Tracer:
             "incident_id": incident_id,
             "attrs": attrs,
         }
-        with self.path.open("a") as fh:
+        with self.path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(rec, default=str) + "\n")
 
     def output(self, output: Any) -> None:

@@ -80,7 +80,7 @@ class Context:
 
     # ------------------------------------------------------------------ dbt metadata
     def watched_tables(self) -> list[dict[str, Any]]:
-        doc = yaml.safe_load((self.settings.dbt_dir / "models" / "staging" / "_sources.yml").read_text())
+        doc = yaml.safe_load((self.settings.dbt_dir / "models" / "staging" / "_sources.yml").read_text(encoding="utf-8"))
         out = []
         for src in doc["sources"]:
             for t in src.get("tables", []):
@@ -100,8 +100,8 @@ class Context:
         from .blast_radius import LINEAGE_SNAPSHOT
         p = (dbt_dir or self.settings.dbt_dir) / "target" / "manifest.json"
         if p.exists():
-            return json.loads(p.read_text())
-        return json.loads(LINEAGE_SNAPSHOT.read_text()) if self.settings.demo else None
+            return json.loads(p.read_text(encoding="utf-8"))
+        return json.loads(LINEAGE_SNAPSHOT.read_text(encoding="utf-8")) if self.settings.demo else None
 
     # ------------------------------------------------------------------ delegation + approvals
     def say(self, msg: str) -> None:

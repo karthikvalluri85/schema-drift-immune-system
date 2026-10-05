@@ -13,10 +13,10 @@ from .config import REPO_ROOT
 @lru_cache(maxsize=4)
 def load_playbooks(path: str | None = None) -> dict[str, Any]:
     p = Path(path) if path else REPO_ROOT / "policies" / "playbooks.yaml"
-    return yaml.safe_load(p.read_text())
+    return yaml.safe_load(p.read_text(encoding="utf-8"))
 
 
 @lru_cache(maxsize=4)
 def load_invariants(path: str | None = None) -> list[dict[str, Any]]:
     p = Path(path) if path else REPO_ROOT / "policies" / "invariants.yaml"
-    return yaml.safe_load(p.read_text())["rules"]
+    return yaml.safe_load(p.read_text(encoding="utf-8"))["rules"]
