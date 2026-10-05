@@ -2,6 +2,10 @@
 -- SDIS control plane (owned by SDIS_AGENT_ROLE)
 -- Everything an incident needs to be explained, costed and audited lives here.
 -- =============================================================================
+-- Run in a Snowsight worksheet as the same user that ran 00_setup_account.sql (an ACCOUNTADMIN user).
+-- The next three lines set the context for you; no need to pick a role, warehouse or database by hand.
+-- If `use role` fails with "Requested role ... is not assigned", run once as ACCOUNTADMIN:
+--     grant role SDIS_AGENT_ROLE to user <your_user>;
 use role SDIS_AGENT_ROLE;
 use warehouse SDIS_WH;
 use schema SDIS_DB.DRIFT;
@@ -27,7 +31,7 @@ create table if not exists LOAD_GATE (
     table_fqn      varchar        not null,
     load_id        varchar        not null,
     row_count      number,
-    status         varchar        not null default 'PENDING',   -- PENDING | PASSED | QUARANTINED
+    status         varchar        default 'PENDING' not null,   -- PENDING | PASSED | QUARANTINED
     incident_id    varchar,
     decided_by     varchar,
     decided_at     timestamp_ltz,
@@ -84,7 +88,7 @@ create table if not exists INCIDENTS (
     route           varchar        not null,   -- playbook route id
     blast_radius    variant,
     decision        variant,                    -- full RouteDecision (deterministic, replayable)
-    status          varchar        not null default 'OPEN',  -- OPEN | MITIGATED | RESOLVED
+    status          varchar        default 'OPEN' not null,  -- OPEN | MITIGATED | RESOLVED
     narrative       varchar,                    -- Cortex-written explanation (never used for routing)
     jira_key        varchar,
     pr_url          varchar,
@@ -125,5 +129,5 @@ group by 1, 2;
 create or replace view PASSED_LOADS as
 select table_fqn, load_id from LOAD_GATE where status = 'PASSED';
 
-grant usage on schema SDIS_DB.DRIFT to role SDIS_TRANSFORM_ROLE;
+-- (usage on the DRIFT schema for dbt is granted in 00_setup_account.sql by the schema owner)
 grant select on view SDIS_DB.DRIFT.PASSED_LOADS to role SDIS_TRANSFORM_ROLE;
