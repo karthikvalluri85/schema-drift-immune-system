@@ -28,8 +28,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip}
       - run: pip install -e ".[api,dashboard,dev]"
       - name: Lint
@@ -55,14 +55,14 @@ jobs:
       SNOWFLAKE_PRIVATE_KEY_PATH: ${{ github.workspace }}/dbt_key.p8
       SDIS_DBT_SCHEMA: ANALYTICS_CI_${{ github.event.number }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: {fetch-depth: 0}
       - id: creds
         run: echo "present=${{ env.SNOWFLAKE_ACCOUNT != '' }}" >> "$GITHUB_OUTPUT"
       - if: steps.creds.outputs.present != 'true'
         run: echo "::notice::Snowflake secrets not configured — skipping Slim CI dbt build"
       - if: steps.creds.outputs.present == 'true'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip}
       - if: steps.creds.outputs.present == 'true'
         run: |
@@ -71,7 +71,7 @@ jobs:
           chmod 600 "$SNOWFLAKE_PRIVATE_KEY_PATH"
       - name: Download production manifest (the comparison state)
         if: steps.creds.outputs.present == 'true'
-        uses: dawidd6/action-download-artifact@v6
+        uses: dawidd6/action-download-artifact@v27
         with:
           workflow: ci.yml
           branch: main
@@ -124,11 +124,11 @@ jobs:
       SNOWFLAKE_DBT_USER: SDIS_DBT_SVC
       SNOWFLAKE_PRIVATE_KEY_PATH: ${{ github.workspace }}/dbt_key.p8
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: creds
         run: echo "present=${{ env.SNOWFLAKE_ACCOUNT != '' }}" >> "$GITHUB_OUTPUT"
       - if: steps.creds.outputs.present == 'true'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip}
       - if: steps.creds.outputs.present == 'true'
         run: |
@@ -141,7 +141,7 @@ jobs:
         run: dbt build --profiles-dir .
       - name: Publish prod manifest for Slim CI
         if: steps.creds.outputs.present == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dbt-prod-manifest
           path: dbt/target/manifest.json

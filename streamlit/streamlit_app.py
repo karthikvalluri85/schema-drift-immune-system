@@ -258,7 +258,10 @@ with tab_gate:
             return f"color: {GATE_COLORS.get(v, '#000')}; font-weight: 600"
         cols = [c for c in ["TABLE_FQN", "LOAD_ID", "ROW_COUNT", "STATUS", "INCIDENT_ID", "DECIDED_BY", "DECIDED_AT"]
                 if c in gate.columns]
-        st.dataframe(gate[cols].style.map(_style, subset=["STATUS"]), use_container_width=True, hide_index=True)
+        styler = gate[cols].style
+        # Styler.map is pandas ≥ 2.1; Streamlit in Snowflake may ship an older pandas with applymap
+        styled = (styler.map if hasattr(styler, "map") else styler.applymap)(_style, subset=["STATUS"])
+        st.dataframe(styled, use_container_width=True, hide_index=True)
 
 with tab_lab:
     st.markdown("Run the **real** engine on each of the five drift scenarios (fixture data, no Snowflake needed).")

@@ -67,7 +67,8 @@ grant select on all tables    in schema SDIS_DB.RAW to role SDIS_AGENT_ROLE;
 grant select on future tables in schema SDIS_DB.RAW to role SDIS_AGENT_ROLE;
 
 -- Agents own the control plane
-grant usage, create table, create view, create procedure on schema SDIS_DB.DRIFT to role SDIS_AGENT_ROLE;
+grant usage, create table, create view, create procedure, create stage, create streamlit
+  on schema SDIS_DB.DRIFT to role SDIS_AGENT_ROLE;   -- stage + streamlit: 03_streamlit_in_snowflake.sql
 
 -- dbt: read RAW, read the load gate, build ANALYTICS
 grant usage on schema SDIS_DB.RAW   to role SDIS_TRANSFORM_ROLE;

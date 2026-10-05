@@ -281,7 +281,7 @@ def main() -> int:
     ap.add_argument("--width", type=int, default=960)
     ap.add_argument("--fps", type=int, default=10)
     ap.add_argument("--pace", type=float, default=2.5, help="seconds each agent's live run stays visible")
-    ap.add_argument("--state", default=str(ROOT / ".sdis-demo" / "record" / "state.pkl"))
+    ap.add_argument("--state", default=str(ROOT / ".sdis-demo" / "record" / "state.json"))
     ap.add_argument("--out", default=str(ROOT / "docs" / "assets"))
     a = ap.parse_args()
     state = Path(a.state)

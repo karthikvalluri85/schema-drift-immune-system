@@ -8,15 +8,15 @@ Every agent decision still comes from the real engine and playbooks; only the ed
   * warehouse → fixture profiles from sdis/scenarios.py (the same numbers the Snowflake scripts produce)
   * GitHub    → the Surgeon really patches a copy of dbt/ and renders the diff; the "PR" is recorded locally
   * Jira      → tickets are recorded locally
-State is pickled to one file and guarded by a file lock, because each Paperclip heartbeat is its own process.
+State is one JSON file guarded by a file lock, because each Paperclip heartbeat is its own process.
 Use it to try the company without accounts, and to record demos. Never point it at production.
 """
 from __future__ import annotations
 
 import atexit
 import fcntl
+import json
 import os
-import pickle
 import shutil
 import time
 from contextlib import contextmanager
@@ -25,7 +25,7 @@ from typing import Any
 
 from . import invariants
 from . import scenarios as S
-from .models import RouteDecision
+from .models import ColumnMeta, ColumnProfile, RouteDecision
 
 NARRATIVE = {
     "rename": ("The orders service renamed its customer key from CUST_ID to CUSTOMER_ID. Every customer-level model "
@@ -43,11 +43,27 @@ NARRATIVE = {
 
 
 def state_path() -> Path:
-    return Path(os.environ.get("SDIS_DEMO_STATE", ".sdis-demo/state.pkl")).resolve()
+    return Path(os.environ.get("SDIS_DEMO_STATE", ".sdis-demo/state.json")).resolve()
+
+
+def _dump(d: dict[str, Any]) -> str:
+    out = dict(d)
+    out["snapshots"] = {k: [c.__dict__ for c in v] for k, v in d.get("snapshots", {}).items()}
+    out["profiles"] = {ld: {c: p.__dict__ for c, p in cols.items()} for ld, cols in d.get("profiles", {}).items()}
+    out["prs"] = {str(k): v for k, v in d.get("prs", {}).items()}
+    return json.dumps(out, default=str)
+
+
+def _load(text: str) -> dict[str, Any]:
+    d = json.loads(text)
+    d["snapshots"] = {k: [ColumnMeta(**c) for c in v] for k, v in d.get("snapshots", {}).items()}
+    d["profiles"] = {ld: {c: ColumnProfile(**p) for c, p in cols.items()} for ld, cols in d.get("profiles", {}).items()}
+    d["prs"] = {int(k): v for k, v in d.get("prs", {}).items()}
+    return d
 
 
 class _Store:
-    """One pickled dict, locked for the life of the process that opened it."""
+    """One JSON-backed dict, locked for the life of the process that opened it."""
 
     _lock_fh = None
     _data: dict[str, Any] | None = None
@@ -63,7 +79,7 @@ class _Store:
             p.parent.mkdir(parents=True, exist_ok=True)
             cls._lock_fh = open(p.with_suffix(".lock"), "w")  # noqa: SIM115 — held until exit
             fcntl.flock(cls._lock_fh, fcntl.LOCK_EX)
-            cls._data = pickle.loads(p.read_bytes()) if p.exists() else {}  # noqa: S301 — local file we wrote
+            cls._data = _load(p.read_text()) if p.exists() else {}
             if not cls._hooked:
                 atexit.register(cls.save)
                 cls._hooked = True
@@ -72,7 +88,7 @@ class _Store:
     @classmethod
     def save(cls) -> None:
         if cls._data is not None and cls._path is not None:
-            cls._path.write_bytes(pickle.dumps(cls._data))
+            cls._path.write_text(_dump(cls._data))
         if cls._lock_fh is not None:
             fcntl.flock(cls._lock_fh, fcntl.LOCK_UN)
             cls._lock_fh.close()

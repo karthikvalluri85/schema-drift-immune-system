@@ -41,29 +41,19 @@ select
     current_timestamp()                                                         as _loaded_at
 from table(generator(rowcount => 2000));
 
-execute immediate $$
-declare
-  load_date date;
-  load_id varchar;
-begin
-  for i in 0 to 6 do
-    load_date := dateadd(day, :i, '2026-09-26'::date);
-    load_id   := 'L' || to_char(:load_date, 'YYYYMMDD');
-    insert into ORDERS
-    select
-        :i * 3000 + row_number() over (order by seq4())                        as order_id,
-        uniform(1, 2000, random())                                             as cust_id,
-        dateadd(second, uniform(0, 86399, random()), :load_date::timestamp_ntz) as order_ts,
-        round(greatest(149, normal(2400, 900, random())), 2)                   as amount,
-        iff(uniform(0, 9, random()) < 8, 'C', 'A')                             as status,
-        array_construct('web','app','store')[uniform(0, 2, random())]::varchar as channel,
-        :load_id                                                               as _load_id,
-        current_timestamp()                                                    as _loaded_at
-    from table(generator(rowcount => 3000));
-  end for;
-  return 'seeded 7 loads';
-end;
-$$;
+-- 7 daily loads x 3,000 orders in one plain INSERT (no scripting block): row n belongs to day (n-1)/3000.
+insert into ORDERS (ORDER_ID, CUST_ID, ORDER_TS, AMOUNT, STATUS, CHANNEL, _LOAD_ID, _LOADED_AT)
+select
+    n                                                                          as order_id,
+    uniform(1, 2000, random())                                                 as cust_id,
+    dateadd(second, uniform(0, 86399, random()),
+            dateadd(day, floor((n - 1) / 3000), '2026-09-26'::date)::timestamp_ntz) as order_ts,
+    round(greatest(149, normal(2400, 900, random())), 2)                       as amount,
+    iff(uniform(0, 9, random()) < 8, 'C', 'A')                                 as status,
+    array_construct('web','app','store')[uniform(0, 2, random())]::varchar     as channel,
+    'L' || to_char(dateadd(day, floor((n - 1) / 3000), '2026-09-26'::date), 'YYYYMMDD') as _load_id,
+    current_timestamp()                                                        as _loaded_at
+from (select row_number() over (order by seq4()) as n from table(generator(rowcount => 21000)));
 
 -- Agents need SELECT on the recreated tables (future grants cover new tables,
 -- but re-grant explicitly to be safe after CREATE OR REPLACE).
