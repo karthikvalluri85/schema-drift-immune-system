@@ -71,7 +71,7 @@ jobs:
           chmod 600 "$SNOWFLAKE_PRIVATE_KEY_PATH"
       - name: Download production manifest (the comparison state)
         if: steps.creds.outputs.present == 'true'
-        uses: dawidd6/action-download-artifact@v6
+        uses: dawidd6/action-download-artifact@v27
         with:
           workflow: ci.yml
           branch: main
