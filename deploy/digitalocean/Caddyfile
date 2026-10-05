@@ -1,0 +1,15 @@
+# Caddy terminates HTTPS (Let's Encrypt) and proxies to services bound to localhost.
+paperclip.{HOST_SUFFIX} {
+	reverse_proxy 127.0.0.1:3100
+}
+
+api.{HOST_SUFFIX} {
+	reverse_proxy 127.0.0.1:8000
+}
+
+dash.{HOST_SUFFIX} {
+	basic_auth {
+		{DASH_USER} {DASH_HASH}
+	}
+	reverse_proxy 127.0.0.1:8501
+}

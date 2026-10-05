@@ -1,0 +1,26 @@
+model: stg_customers
+description: One row per customer.
+source:
+  name: raw
+  table: customers
+dedupe_key: cust_id
+columns:
+- alias: cust_id
+  source: CUST_ID
+  type: number(38,0)
+  tests:
+  - not_null
+  - unique
+  description: Customer identifier
+- alias: segment
+  source: SEGMENT
+  type: varchar
+  description: CONSUMER / SMB / ENTERPRISE
+- alias: city
+  source: CITY
+  type: varchar
+  description: Customer city
+- alias: signup_date
+  source: SIGNUP_DATE
+  type: date
+  description: Signup date

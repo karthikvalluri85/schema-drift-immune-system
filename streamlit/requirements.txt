@@ -1,0 +1,5 @@
+# Streamlit Community Cloud (free) — demo mode needs only these; `sdis` is imported from the repo checkout.
+streamlit>=1.40
+pandas>=2.2
+pyyaml>=6
+requests>=2.31

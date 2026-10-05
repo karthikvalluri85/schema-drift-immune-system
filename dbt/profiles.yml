@@ -1,0 +1,16 @@
+# No secrets in this file — everything comes from environment variables.
+# Key-pair auth for the SDIS_DBT_SVC service user (see snowflake/00_setup_account.sql).
+sdis:
+  target: "{{ env_var('SDIS_DBT_TARGET', 'dev') }}"
+  outputs:
+    dev:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_DBT_USER', 'SDIS_DBT_SVC') }}"
+      private_key_path: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PATH') }}"
+      role: SDIS_TRANSFORM_ROLE
+      warehouse: SDIS_WH
+      database: SDIS_DB
+      schema: "{{ env_var('SDIS_DBT_SCHEMA', 'ANALYTICS') }}"
+      threads: 4
+      query_tag: '{"app":"sdis","agent":"dbt"}'

@@ -1,0 +1,21 @@
+# Security gates (pattern from aws-samples/sample-Agentic-Ai-Data-Operations):
+# secrets scanning, Python SAST, and the pre-commit hooks — on every PR.
+name: security
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -e . pre-commit bandit detect-secrets
+      - name: pre-commit (yaml, whitespace, large files, detect-secrets, ruff)
+        run: SKIP=no-commit-to-branch pre-commit run --all-files --show-diff-on-failure
+      - name: bandit (medium+)
+        run: bandit -q -r sdis -c pyproject.toml --severity-level medium

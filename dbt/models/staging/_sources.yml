@@ -1,0 +1,63 @@
+version: 2
+sources:
+- name: raw
+  database: '{{ var(''raw_database'') }}'
+  schema: '{{ var(''raw_schema'') }}'
+  description: Bronze landing zone (append-only, owned by upstream producers)
+  tables:
+  - name: orders
+    identifier: ORDERS
+    description: Orders from the orders service, one batch per _LOAD_ID
+    config:
+      meta:
+        owner: orders-service
+        producer_contact: orders-team
+        sdis_watch: true
+        sdis_key: ORDER_ID
+    columns:
+    - name: ORDER_ID
+      data_type: number(38,0)
+    - name: CUST_ID
+      data_type: number(38,0)
+    - name: ORDER_TS
+      data_type: timestamp_ntz
+    - name: AMOUNT
+      data_type: number(10,2)
+    - name: STATUS
+      data_type: varchar(1)
+    - name: CHANNEL
+      data_type: varchar(20)
+    - name: _LOAD_ID
+      data_type: varchar
+    - name: _LOADED_AT
+      data_type: timestamp_ltz
+  - name: customers
+    identifier: CUSTOMERS
+    description: Customer master from the CRM
+    config:
+      meta:
+        owner: crm-team
+        producer_contact: crm-team
+        sdis_watch: true
+        sdis_key: CUST_ID
+    columns:
+    - name: CUST_ID
+      data_type: number(38,0)
+    - name: SEGMENT
+      data_type: varchar(20)
+    - name: CITY
+      data_type: varchar(40)
+    - name: SIGNUP_DATE
+      data_type: date
+    - name: _LOAD_ID
+      data_type: varchar
+    - name: _LOADED_AT
+      data_type: timestamp_ltz
+- name: drift
+  database: '{{ var(''raw_database'') }}'
+  schema: '{{ var(''drift_schema'') }}'
+  description: SDIS control plane
+  tables:
+  - name: passed_loads
+    identifier: PASSED_LOADS
+    description: Loads cleared by the SDIS load gate

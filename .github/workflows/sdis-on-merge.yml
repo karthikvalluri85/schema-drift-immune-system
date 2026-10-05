@@ -1,0 +1,39 @@
+# A merged sdis/inc-… PR is the approval (SEV1/SEV2) or the green-CI auto-merge (SEV3/SEV4).
+# Either way: wake the Auditor → release the load gate → dbt build → RESOLVED, minutes + credits logged.
+name: sdis-on-merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  auditor:
+    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'sdis/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SDIS_APPROVAL_CHANNEL: github
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_PRIVATE_KEY_PATH: ${{ github.workspace }}/../keys/sdis_agent.p8
+      SNOWFLAKE_DBT_PRIVATE_KEY_PATH: ${{ github.workspace }}/../keys/sdis_dbt.p8
+      SNOWFLAKE_DBT_USER: SDIS_DBT_SVC
+      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+      DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: main}
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12", cache: pip}
+      - run: pip install -e .
+      - run: |
+          mkdir -p ../keys
+          printf '%s\n' "${{ secrets.SNOWFLAKE_AGENT_PRIVATE_KEY }}" > ../keys/sdis_agent.p8
+          printf '%s\n' "${{ secrets.SNOWFLAKE_DBT_PRIVATE_KEY }}" > ../keys/sdis_dbt.p8
+          chmod 600 ../keys/*.p8
+      - name: Auditor (merged by ${{ github.event.pull_request.merged_by.login }})
+        run: sdis on-merge --branch "${{ github.event.pull_request.head.ref }}"

@@ -1,0 +1,113 @@
+# Paperclip-specific fidelity for this company package (agentcompanies/v1 sidecar).
+# Deterministic agents use the `process` adapter → they cost $0 in LLM tokens.
+# Only the Head of Data Reliability uses an LLM (Claude Code via `claude_local`).
+# Budgets are in cents per calendar month; Paperclip warns at 80% and auto-pauses at 100%.
+schema: paperclip/v1
+
+_sdis_env: &sdis_env
+  SDIS_REPO_DIR:              {kind: plain,  requirement: required, default: ""}
+  SNOWFLAKE_ACCOUNT:          {kind: plain,  requirement: required, default: ""}
+  SNOWFLAKE_USER:             {kind: plain,  requirement: optional, default: SDIS_AGENT_SVC}
+  SNOWFLAKE_PRIVATE_KEY_PATH: {kind: plain,  requirement: required, default: ""}
+  SDIS_CORTEX_MODEL:          {kind: plain,  requirement: optional, default: claude-sonnet-4-5}
+
+agents:
+  head-of-data-reliability:
+    icon: shield
+    capabilities: Reviews SEV1/SEV2 remediation PRs, unblocks reports, runs the weekly reliability review.
+    budgetMonthlyCents: 2000
+    adapter:
+      type: claude_local
+      config:
+        model: claude-opus-5
+        maxTurnsPerRun: 60
+    runtime:
+      heartbeat: {enabled: true, intervalSec: 3600, wakeOnAssignment: true, wakeOnDemand: true}
+    permissions: {canCreateAgents: false}
+    inputs:
+      env:
+        GH_TOKEN: {kind: secret, requirement: optional}
+
+  sentinel:
+    icon: radar
+    capabilities: Snapshots and profiles every new Bronze load; passes clean loads, escalates drift.
+    budgetMonthlyCents: 100
+    adapter:
+      type: process
+      config: {command: sdis, args: [heartbeat, sentinel], timeoutSec: 600}
+    runtime:
+      heartbeat: {enabled: true, intervalSec: 900, wakeOnAssignment: true, wakeOnAutomation: true, maxConcurrentRuns: 1}
+    inputs: {env: *sdis_env}
+
+  diagnostician:
+    icon: stethoscope
+    capabilities: Deterministic drift classification, blast radius, severity, load gate, Cortex narrative.
+    budgetMonthlyCents: 100
+    adapter:
+      type: process
+      config: {command: sdis, args: [heartbeat, diagnostician], timeoutSec: 600}
+    runtime:
+      heartbeat: {enabled: true, intervalSec: 0, wakeOnAssignment: true, maxConcurrentRuns: 2}
+    inputs: {env: *sdis_env}
+
+  surgeon:
+    icon: wrench
+    capabilities: Minimal dbt fixes as GitHub PRs; merges only with green CI and required approvals.
+    budgetMonthlyCents: 100
+    adapter:
+      type: process
+      config: {command: sdis, args: [heartbeat, surgeon], timeoutSec: 900}
+    runtime:
+      # re-wakes every 5 min to re-check CI on open PRs
+      heartbeat: {enabled: true, intervalSec: 300, wakeOnAssignment: true, maxConcurrentRuns: 1}
+    inputs:
+      env:
+        <<: *sdis_env
+        GITHUB_TOKEN:      {kind: secret, requirement: required}
+        GITHUB_REPOSITORY: {kind: plain,  requirement: optional, default: karthikvalluri85/schema-drift-immune-system}
+
+  diplomat:
+    icon: megaphone
+    capabilities: Jira tickets, producer notes and producer confirmations.
+    budgetMonthlyCents: 100
+    adapter:
+      type: process
+      config: {command: sdis, args: [heartbeat, diplomat], timeoutSec: 300}
+    runtime:
+      heartbeat: {enabled: true, intervalSec: 0, wakeOnAssignment: true, maxConcurrentRuns: 2}
+    inputs:
+      env:
+        <<: *sdis_env
+        JIRA_BASE_URL:    {kind: plain,  requirement: optional, default: "https://karthikvalluri1985.atlassian.net"}
+        JIRA_EMAIL:       {kind: plain,  requirement: required, default: ""}
+        JIRA_API_TOKEN:   {kind: secret, requirement: required}
+        JIRA_PROJECT_KEY: {kind: plain,  requirement: optional, default: SDIS}
+
+  auditor:
+    icon: receipt
+    capabilities: Releases the load gate, verifies with dbt build, resolves incidents, keeps the MTTR/cost ledger.
+    budgetMonthlyCents: 100
+    adapter:
+      type: process
+      config: {command: sdis, args: [heartbeat, auditor], timeoutSec: 1200}
+    runtime:
+      heartbeat: {enabled: true, intervalSec: 0, wakeOnAssignment: true, maxConcurrentRuns: 1}
+    inputs:
+      env:
+        <<: *sdis_env
+        SNOWFLAKE_DBT_PRIVATE_KEY_PATH: {kind: plain, requirement: optional, default: ""}
+        JIRA_EMAIL:     {kind: plain,  requirement: optional, default: ""}
+        JIRA_API_TOKEN: {kind: secret, requirement: optional}
+
+routines:
+  schema-watch:
+    concurrencyPolicy: skip_if_active
+    catchUpPolicy: skip_missed
+    triggers:
+      - {kind: schedule, label: Every 15 minutes, cronExpression: "*/15 * * * *", timezone: Asia/Kolkata}
+  weekly-reliability-review:
+    triggers:
+      - {kind: schedule, label: Monday 09:30 IST, cronExpression: "30 9 * * 1", timezone: Asia/Kolkata}
+  weekly-cost-ledger:
+    triggers:
+      - {kind: schedule, label: Monday 09:00 IST, cronExpression: "0 9 * * 1", timezone: Asia/Kolkata}

@@ -1,0 +1,53 @@
+version: 2
+
+models:
+  - name: fct_orders
+    description: Orders enriched with customer attributes
+    columns:
+      - name: order_id
+        data_tests: [not_null, unique]
+      - name: cust_id
+        data_tests:
+          - not_null
+          - relationships: {arguments: {to: ref('stg_customers'), field: cust_id}}
+  - name: dim_customers
+    description: Customer dimension with order history
+    columns:
+      - name: cust_id
+        data_tests: [not_null, unique]
+  - name: customer_ltv
+    description: Lifetime value per customer (completed orders)
+  - name: fct_revenue_daily
+    description: Daily revenue by channel and segment
+  - name: mart_finance_kpis
+    description: Daily GMV / orders / AOV for finance
+
+exposures:
+  - name: exec_revenue_dashboard
+    label: Executive Revenue Dashboard
+    type: dashboard
+    maturity: high
+    owner: {name: CFO Office, email: cfo-office@shopverse.example}
+    depends_on: [ref('fct_revenue_daily'), ref('mart_finance_kpis')]
+    config: {meta: {tier: 1, audience: CXO}}
+  - name: finance_month_close
+    label: Finance Month-End Close
+    type: application
+    maturity: high
+    owner: {name: Finance Controllership, email: controllership@shopverse.example}
+    depends_on: [ref('mart_finance_kpis')]
+    config: {meta: {tier: 1, audience: Finance}}
+  - name: customer_360
+    label: Customer 360
+    type: dashboard
+    maturity: medium
+    owner: {name: Customer Success, email: cs-analytics@shopverse.example}
+    depends_on: [ref('dim_customers'), ref('customer_ltv')]
+    config: {meta: {tier: 2, audience: Customer Success}}
+  - name: marketing_ltv_segments
+    label: Marketing LTV Segmentation
+    type: ml
+    maturity: medium
+    owner: {name: Growth Marketing, email: growth@shopverse.example}
+    depends_on: [ref('customer_ltv')]
+    config: {meta: {tier: 2, audience: Marketing}}

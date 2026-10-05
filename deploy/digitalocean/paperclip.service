@@ -1,0 +1,16 @@
+[Unit]
+Description=Paperclip control plane (SDIS company)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=sdis
+EnvironmentFile=/etc/sdis/sdis.env
+Environment=PATH=/opt/sdis/venv/bin:/usr/local/bin:/usr/bin:/bin
+WorkingDirectory=/opt/sdis/repo
+ExecStart=/usr/bin/npx --yes paperclipai run
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

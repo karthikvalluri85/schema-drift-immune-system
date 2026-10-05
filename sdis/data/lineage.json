@@ -1,0 +1,129 @@
+{
+ "child_map": {
+  "exposure.sdis_shopverse.customer_360": [],
+  "exposure.sdis_shopverse.exec_revenue_dashboard": [],
+  "exposure.sdis_shopverse.finance_month_close": [],
+  "exposure.sdis_shopverse.marketing_ltv_segments": [],
+  "model.sdis_shopverse.customer_ltv": [
+   "exposure.sdis_shopverse.customer_360",
+   "exposure.sdis_shopverse.marketing_ltv_segments"
+  ],
+  "model.sdis_shopverse.dim_customers": [
+   "exposure.sdis_shopverse.customer_360"
+  ],
+  "model.sdis_shopverse.fct_orders": [
+   "model.sdis_shopverse.customer_ltv",
+   "model.sdis_shopverse.fct_revenue_daily"
+  ],
+  "model.sdis_shopverse.fct_revenue_daily": [
+   "exposure.sdis_shopverse.exec_revenue_dashboard",
+   "model.sdis_shopverse.mart_finance_kpis"
+  ],
+  "model.sdis_shopverse.mart_finance_kpis": [
+   "exposure.sdis_shopverse.exec_revenue_dashboard",
+   "exposure.sdis_shopverse.finance_month_close"
+  ],
+  "model.sdis_shopverse.stg_customers": [
+   "model.sdis_shopverse.dim_customers",
+   "model.sdis_shopverse.fct_orders"
+  ],
+  "model.sdis_shopverse.stg_orders": [
+   "model.sdis_shopverse.dim_customers",
+   "model.sdis_shopverse.fct_orders"
+  ],
+  "source.sdis_shopverse.drift.passed_loads": [
+   "model.sdis_shopverse.stg_customers",
+   "model.sdis_shopverse.stg_orders"
+  ],
+  "source.sdis_shopverse.raw.customers": [
+   "model.sdis_shopverse.stg_customers"
+  ],
+  "source.sdis_shopverse.raw.orders": [
+   "model.sdis_shopverse.stg_orders"
+  ]
+ },
+ "exposures": {
+  "exposure.sdis_shopverse.customer_360": {
+   "config": {
+    "meta": {
+     "audience": "Customer Success",
+     "tier": 2
+    }
+   },
+   "label": "Customer 360",
+   "name": "customer_360",
+   "owner": {
+    "name": "Customer Success"
+   },
+   "type": "dashboard"
+  },
+  "exposure.sdis_shopverse.exec_revenue_dashboard": {
+   "config": {
+    "meta": {
+     "audience": "CXO",
+     "tier": 1
+    }
+   },
+   "label": "Executive Revenue Dashboard",
+   "name": "exec_revenue_dashboard",
+   "owner": {
+    "name": "CFO Office"
+   },
+   "type": "dashboard"
+  },
+  "exposure.sdis_shopverse.finance_month_close": {
+   "config": {
+    "meta": {
+     "audience": "Finance",
+     "tier": 1
+    }
+   },
+   "label": "Finance Month-End Close",
+   "name": "finance_month_close",
+   "owner": {
+    "name": "Finance Controllership"
+   },
+   "type": "application"
+  },
+  "exposure.sdis_shopverse.marketing_ltv_segments": {
+   "config": {
+    "meta": {
+     "audience": "Marketing",
+     "tier": 2
+    }
+   },
+   "label": "Marketing LTV Segmentation",
+   "name": "marketing_ltv_segments",
+   "owner": {
+    "name": "Growth Marketing"
+   },
+   "type": "ml"
+  }
+ },
+ "metadata": {
+  "project_name": "sdis_shopverse"
+ },
+ "nodes": {
+  "model.sdis_shopverse.customer_ltv": {
+   "name": "customer_ltv"
+  },
+  "model.sdis_shopverse.dim_customers": {
+   "name": "dim_customers"
+  },
+  "model.sdis_shopverse.fct_orders": {
+   "name": "fct_orders"
+  },
+  "model.sdis_shopverse.fct_revenue_daily": {
+   "name": "fct_revenue_daily"
+  },
+  "model.sdis_shopverse.mart_finance_kpis": {
+   "name": "mart_finance_kpis"
+  },
+  "model.sdis_shopverse.stg_customers": {
+   "name": "stg_customers"
+  },
+  "model.sdis_shopverse.stg_orders": {
+   "name": "stg_orders"
+  }
+ }
+}

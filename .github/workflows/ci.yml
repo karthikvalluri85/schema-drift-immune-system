@@ -1,0 +1,148 @@
+# CI for the Schema Drift Immune System
+#   test      → lint, unit tests (all 5 drift scenarios), codegen drift check, dbt parse   [every PR + main]
+#   slim-ci   → dbt build of ONLY what changed: state:modified+ --defer against prod      [PRs, needs Snowflake secrets]
+#   deploy    → dbt build on prod + publish manifest.json as the next PR's comparison state [main]
+# The Surgeon merges a PR only when every check here is green (invariant: tests-before-merge).
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+
+env:
+  PYTHON_VERSION: "3.12"
+  DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip}
+      - run: pip install -e ".[api,dashboard,dev]"
+      - name: Lint
+        run: ruff check .
+      - name: Generated staging models match their maps
+        run: sdis codegen --check
+      - name: dbt parse (offline)
+        working-directory: dbt
+        env: {SNOWFLAKE_ACCOUNT: offline, SNOWFLAKE_PRIVATE_KEY_PATH: /dev/null}
+        run: dbt parse --profiles-dir .
+      - name: Unit tests (engine, invariants, Surgeon patches, API, dashboard, Paperclip package)
+        run: pytest -q
+      - name: Simulate all five drift scenarios
+        run: sdis simulate all > simulation.md && tail -n 40 simulation.md >> "$GITHUB_STEP_SUMMARY"
+
+  slim-ci:
+    if: github.event_name == 'pull_request'
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_DBT_USER: SDIS_DBT_SVC
+      SNOWFLAKE_PRIVATE_KEY_PATH: ${{ github.workspace }}/dbt_key.p8
+      SDIS_DBT_SCHEMA: ANALYTICS_CI_${{ github.event.number }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - id: creds
+        run: echo "present=${{ env.SNOWFLAKE_ACCOUNT != '' }}" >> "$GITHUB_OUTPUT"
+      - if: steps.creds.outputs.present != 'true'
+        run: echo "::notice::Snowflake secrets not configured — skipping Slim CI dbt build"
+      - if: steps.creds.outputs.present == 'true'
+        uses: actions/setup-python@v5
+        with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip}
+      - if: steps.creds.outputs.present == 'true'
+        run: |
+          pip install -e .
+          printf '%s\n' "${{ secrets.SNOWFLAKE_DBT_PRIVATE_KEY }}" > "$SNOWFLAKE_PRIVATE_KEY_PATH"
+          chmod 600 "$SNOWFLAKE_PRIVATE_KEY_PATH"
+      - name: Download production manifest (the comparison state)
+        if: steps.creds.outputs.present == 'true'
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: ci.yml
+          branch: main
+          name: dbt-prod-manifest
+          path: prod-artifacts
+          if_no_artifact_found: warn
+      - name: Slim CI — build only what changed, defer the rest to prod
+        if: steps.creds.outputs.present == 'true'
+        working-directory: dbt
+        run: |
+          set -euo pipefail
+          if [ -f ../prod-artifacts/manifest.json ]; then
+            MODELS=$(dbt ls --profiles-dir . --select "state:modified+" --state ../prod-artifacts --resource-type model --output name --quiet || true)
+            if [ -z "$MODELS" ] && git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -q '^dbt/models/staging/_sources.yml$'; then
+              # Verified edge case: documenting a new source column (additive playbook) does NOT mark
+              # anything state:modified. Build the staging layer on top of RAW so the PR is still exercised.
+              SELECT="source:raw+"
+              echo "Only source docs changed → selecting $SELECT"
+            elif [ -z "$MODELS" ]; then
+              SELECT=""
+            else
+              SELECT="state:modified+"
+              echo "state:modified+ selected: $MODELS"
+            fi
+            if [ -n "${SELECT// /}" ]; then
+              dbt build --profiles-dir . --select $SELECT --defer --state ../prod-artifacts
+            else
+              echo "Nothing to build."
+            fi
+          else
+            echo "::warning::No production manifest yet (first run) — full build"
+            dbt build --profiles-dir .
+          fi
+      - name: Summarise what Slim CI built (compare with the PR's blast radius)
+        if: always() && steps.creds.outputs.present == 'true'
+        run: python scripts/ci_summary.py dbt/target/run_results.json >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Drop the PR schema
+        if: always() && steps.creds.outputs.present == 'true'
+        working-directory: dbt
+        run: |
+          dbt run-operation --profiles-dir . drop_schemas_with_prefix --args "{prefix: $SDIS_DBT_SCHEMA}" || true
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_DBT_USER: SDIS_DBT_SVC
+      SNOWFLAKE_PRIVATE_KEY_PATH: ${{ github.workspace }}/dbt_key.p8
+    steps:
+      - uses: actions/checkout@v4
+      - id: creds
+        run: echo "present=${{ env.SNOWFLAKE_ACCOUNT != '' }}" >> "$GITHUB_OUTPUT"
+      - if: steps.creds.outputs.present == 'true'
+        uses: actions/setup-python@v5
+        with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip}
+      - if: steps.creds.outputs.present == 'true'
+        run: |
+          pip install -e .
+          printf '%s\n' "${{ secrets.SNOWFLAKE_DBT_PRIVATE_KEY }}" > "$SNOWFLAKE_PRIVATE_KEY_PATH"
+          chmod 600 "$SNOWFLAKE_PRIVATE_KEY_PATH"
+      - name: dbt build (prod)
+        if: steps.creds.outputs.present == 'true'
+        working-directory: dbt
+        run: dbt build --profiles-dir .
+      - name: Publish prod manifest for Slim CI
+        if: steps.creds.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbt-prod-manifest
+          path: dbt/target/manifest.json
+          retention-days: 30

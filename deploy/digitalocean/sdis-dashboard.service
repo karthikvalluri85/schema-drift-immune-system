@@ -1,0 +1,13 @@
+[Unit]
+Description=SDIS Streamlit command center
+After=network-online.target
+
+[Service]
+User=sdis
+EnvironmentFile=/etc/sdis/sdis.env
+WorkingDirectory=/opt/sdis/repo
+ExecStart=/opt/sdis/venv/bin/streamlit run streamlit/streamlit_app.py --server.address 127.0.0.1 --server.port 8501 --server.headless true --browser.gatherUsageStats false
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

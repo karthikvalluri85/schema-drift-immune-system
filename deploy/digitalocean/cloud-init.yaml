@@ -1,0 +1,43 @@
+#cloud-config
+# =============================================================================
+# One-shot DigitalOcean Droplet bootstrap for the whole SDIS company.
+# Paste this into "Advanced options → Add Initialized scripts (free)" when creating
+# an Ubuntu 24.04 Droplet (4 GB RAM recommended; 2 GB works with the swap below).
+#
+# Result (HTTPS via Caddy + Let's Encrypt, no domain needed thanks to sslip.io):
+#   https://paperclip.<DROPLET-IP>.sslip.io   Paperclip UI (org chart, issues, costs) — login required
+#   https://api.<DROPLET-IP>.sslip.io/docs     SDIS FastAPI (webhooks for GitHub + Jira)
+#   https://dash.<DROPLET-IP>.sslip.io         Streamlit command center (basic auth)
+# After boot: SSH in and run `sudo /opt/sdis/repo/deploy/digitalocean/finish-setup.sh`.
+# =============================================================================
+package_update: true
+packages: [git, python3-venv, python3-pip, curl, ufw, debian-keyring, debian-archive-keyring, apt-transport-https]
+
+swap:
+  filename: /swapfile
+  size: 2G
+
+users:
+  - default
+  - name: sdis
+    shell: /bin/bash
+    system: false
+
+runcmd:
+  # Node 22 for Paperclip
+  - curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+  - apt-get install -y nodejs
+  # Caddy (automatic HTTPS)
+  - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+  - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' -o /etc/apt/sources.list.d/caddy-stable.list
+  - apt-get update && apt-get install -y caddy
+  # SDIS code + Python env
+  - mkdir -p /opt/sdis /etc/sdis/keys /var/lib/paperclip
+  - git clone https://github.com/karthikvalluri85/schema-drift-immune-system /opt/sdis/repo
+  - python3 -m venv /opt/sdis/venv
+  - /opt/sdis/venv/bin/pip install -e "/opt/sdis/repo[api,dashboard]"
+  - ln -sf /opt/sdis/venv/bin/sdis /usr/local/bin/sdis
+  - chown -R sdis:sdis /opt/sdis /etc/sdis /var/lib/paperclip
+  # Firewall: only SSH + HTTP(S); app ports stay on localhost behind Caddy
+  - ufw allow OpenSSH && ufw allow 80 && ufw allow 443 && ufw --force enable
+  - echo "SDIS bootstrap done. Next → sudo /opt/sdis/repo/deploy/digitalocean/finish-setup.sh" > /etc/motd
