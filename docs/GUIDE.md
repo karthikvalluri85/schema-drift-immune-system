@@ -149,7 +149,7 @@ git clone https://github.com/karthikvalluri85/schema-drift-immune-system && cd s
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[api,dashboard,dev]"
 sdis simulate all            # every scenario: decision, blast radius, the PR diff
-pytest -q                    # 85 tests
+pytest -q                    # 98 tests
 ```
 
 ### Step B · Snowflake (your trial account)
