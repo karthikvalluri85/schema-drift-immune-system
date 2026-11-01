@@ -1,5 +1,5 @@
 # SDIS API + dashboard image (Paperclip itself runs via `npx paperclipai run`; see digitalocean/).
-FROM python:3.12-slim
+FROM python:3.15-slim
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 RUN useradd --create-home --uid 1000 sdis
 WORKDIR /app
